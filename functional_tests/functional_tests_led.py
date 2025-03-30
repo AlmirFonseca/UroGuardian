@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Adiciona a pasta pai ao sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 from src.led import RGBLed
 
 led = RGBLed(dt_pin=5, sck_pin=6)  # Sample pins

@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Adiciona a pasta pai ao sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
 
 from src.database import Database
 from src.config_manager import ConfigManager
