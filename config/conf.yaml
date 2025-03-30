@@ -1,0 +1,7 @@
+# RGB LED control
+led_type: common_anode            # [common_anode, common_cathode]
+brightness: 10                    # [0-100] %
+
+# NTP Server
+ntp_server: pool.ntp.org          # NTP server address
+timezone: UTC-3                   # Timezone offset from UTC
