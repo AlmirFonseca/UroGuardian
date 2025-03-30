@@ -15,7 +15,7 @@ class ConfigManager:
         nome do arquivo.
     """
 
-    def __init__(self, config_dir: str = "config") -> None:
+    def __init__(self, config_dir: str = "../config") -> None:
         """Inicializa o gerenciador de configuração.
 
         Args:

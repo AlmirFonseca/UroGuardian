@@ -5,7 +5,8 @@ import shutil
 from datetime import datetime
 from flask import Flask, jsonify
 from typing import Any, Dict
-from config_manager import ConfigManager
+
+from src.config_manager import ConfigManager
 
 
 class Database:
@@ -21,7 +22,7 @@ class Database:
         cursor (sqlite3.Cursor): Cursor object for executing SQL queries.
     """
 
-    def __init__(self, config_manager: ConfigManager, db_file: str = "sensor_data.db") -> None:
+    def __init__(self, config_manager: ConfigManager, db_file: str = "../sensor_data.db") -> None:
         """Initializes the database connection and loads queries.
 
         Args:
@@ -34,7 +35,7 @@ class Database:
         self.db_file = db_file
         self.config_manager = config_manager
         self.queries = self.load_queries()
-        self.connection = sqlite3.connect(self.db_file)
+        self.connection = sqlite3.connect(self.db_file, check_same_thread=False)
         self.cursor = self.connection.cursor()
 
         self.initialize_db()
@@ -45,7 +46,7 @@ class Database:
         Returns:
             Dict[str, str]: Dictionary of queries.
         """
-        queries_file = "config/db_queries.yaml"
+        queries_file = "../config/db_queries.yaml"
         if not os.path.exists(queries_file):
             raise FileNotFoundError(f"Queries file '{queries_file}' not found.")
         
@@ -63,7 +64,7 @@ class Database:
             self.execute_query(query_key, query)
 
     def execute_query(self, query_key: str, query: str, params: tuple = ()) -> None:
-        """Execute a query (INSERT, SELECT, etc.) on the database.
+        """Execute a query (INSERT, SELECT, etc.) on the database. 
 
         Args:
             query_key (str): The key identifying the query.

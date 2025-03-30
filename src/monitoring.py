@@ -3,9 +3,10 @@ import time
 import schedule
 from datetime import datetime
 from typing import Optional
-from database import Database
 from typing import Tuple
 import subprocess
+
+from src.database import Database
 
 
 class SystemMonitoring:
@@ -79,7 +80,7 @@ class SystemMonitoring:
 
         Returns:
             tuple: A tuple containing SSID and the signal strength in dB (e.g., ('SSID', -70)).
-            
+        
         Raises:
             subprocess.CalledProcessError: If the command to get Wi-Fi details fails.
         """
@@ -87,30 +88,16 @@ class SystemMonitoring:
             # Get the Wi-Fi interface (assuming wlan0 here)
             wifi_data = psutil.net_if_addrs().get('wlan0', None)
             if wifi_data:
-                ssid = subprocess.check_output(["iwgetid", "wlan0", "--pretty"]).decode().strip().split('=')[1]
+                # Changed iwgetid to a simpler command without --pretty
+                ssid = subprocess.check_output(["iwgetid", "wlan0", "-r"]).decode().strip()
+                
                 signal_strength = subprocess.check_output(["iwconfig", "wlan0"]).decode()
                 signal_strength_db = self.extract_signal_strength(signal_strength)
+                
                 return ssid, signal_strength_db
             return None
         except Exception as e:
             print(f"Error fetching Wi-Fi details: {e}")
-            return None
-
-    def extract_signal_strength(self, iwconfig_output: str) -> Optional[float]:
-        """Extract the signal strength (in dB) from the iwconfig output.
-        
-        Raises:
-            ValueError: If the signal strength cannot be extracted.
-        """
-        try:
-            # This is an example, your output format may vary
-            line = [line for line in iwconfig_output.splitlines() if 'Signal level' in line]
-            if line:
-                signal_strength = line[0].split('Signal level=')[1].split(' dBm')[0]
-                return float(signal_strength)
-            return None
-        except Exception as e:
-            print(f"Error extracting signal strength: {e}")
             return None
 
     def collect_and_store_data(self) -> None:

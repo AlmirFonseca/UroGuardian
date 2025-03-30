@@ -1,5 +1,5 @@
 from typing import Optional
-from config_manager import ConfigManager
+from src.config_manager import ConfigManager
 
 
 class Logger:

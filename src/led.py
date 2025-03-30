@@ -1,7 +1,8 @@
 import RPi.GPIO as GPIO
 import time
 from typing import Dict, Any
-from config_manager import ConfigManager
+
+from src.config_manager import ConfigManager
 
 class RGBLED:
     """Classe para controlar um LED RGB analógico com ajuste de brilho baseado em porcentagem.

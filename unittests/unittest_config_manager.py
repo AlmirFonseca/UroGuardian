@@ -22,6 +22,7 @@ class TestConfigManager(unittest.TestCase):
         self.config_manager.reload()
         config = self.config_manager.get("conf")
         self.assertIn("timezone", config)
+        self.assertEqual(config["timezone"], "UTC-3")  # Adjust based on your config
 
 if __name__ == "__main__":
     unittest.main()

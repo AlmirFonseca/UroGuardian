@@ -5,19 +5,48 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-import sys
-import os
+from src.spectrum import SpectrumSensor
+import board
+import time
 
-# Adiciona a pasta pai ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+def spectrum_demo():
+    # Cria a instância do SpectrumSensor
+    spectrum = SpectrumSensor(i2c_bus=board.I2C())
+    
+    # Display readings for specific channels
+    print("Reading 415nm and 555nm channels...")
+    spectrum.display_channel_readings(["415nm", "555nm"])
 
+    # Display all channel readings
+    print("Reading all channels...")
+    spectrum.display_all_channel_readings()
 
-from src.spectrum import Spectrum
+    # Enable flicker detection
+    print("Enabling flicker detection...")
+    spectrum.enable_flicker_detection(True)
+    
+    # Get flicker detection status
+    flicker_status = spectrum.get_flicker_detection_status()
+    if flicker_status:
+        print(f"Detected a {flicker_status} Hz flicker")
+    else:
+        print("No flicker detected.")
+    
+    # Toggle LED
+    print("Turning on LED...")
+    spectrum.toggle_led(True)
 
-spectrum = Spectrum()
+    # Set LED current
+    print("Setting LED current to 10...")
+    spectrum.set_led_current(10)
+    
+    # Wait 3 seconds
+    print("Waiting for 3 seconds...")
+    time.sleep(3)
+    
+    # Turn off LED
+    print("Turning off LED...")
+    spectrum.toggle_led(False)
 
-# Get spectrum data from the sensor
-spectrum_data = spectrum.read_spectrum()
-
-# Display the spectrum data
-print(f"Spectrum data: {spectrum_data}")
+if __name__ == "__main__":
+    spectrum_demo()
