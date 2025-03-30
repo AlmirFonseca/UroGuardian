@@ -2,7 +2,8 @@ import sys
 import os
 
 # Adiciona a pasta pai ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 from src.rtc import RTC
 from src.config_manager import ConfigManager
