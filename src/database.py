@@ -8,7 +8,6 @@ from typing import Any, Dict
 
 from src.config_manager import ConfigManager
 
-
 class Database:
     """Class for managing the SQLite database with dynamic queries loaded from a YAML file.
 

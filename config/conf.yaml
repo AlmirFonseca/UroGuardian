@@ -1,7 +1,11 @@
 # RGB LED control
 led_type: common_anode            # [common_anode, common_cathode]
-brightness: 10                    # [0-100] %
+brightness: 30                    # [0-100] %
 
 # NTP Server
 ntp_server: pool.ntp.org          # NTP server address
 timezone: UTC-3                   # Timezone offset from UTC
+
+# Controller settings
+collect_interval: 20   # intervalo em segundos para coleta automática
+led_white_current: 20   # corrente em mA para LED interno do AS7341
