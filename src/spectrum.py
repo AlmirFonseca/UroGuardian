@@ -3,6 +3,9 @@ import board
 from adafruit_as7341 import AS7341
 from typing import List, Tuple, Optional
 
+from src.config_manager import ConfigManager
+from src.logger import Logger
+
 class SpectrumSensor:
     """Wrapper class for the AS7341 Spectrometer sensor.
 
@@ -13,7 +16,7 @@ class SpectrumSensor:
         sensor (AS7341): Instance of the AS7341 sensor.
     """
 
-    def __init__(self, i2c_bus=None, address: int = 0x39) -> None:
+    def __init__(self,  conf: ConfigManager, i2c_bus=None) -> None:
         """Initializes the AS7341 sensor.
 
         Args:
@@ -23,10 +26,14 @@ class SpectrumSensor:
         Returns:
             None
         """
+        self.logger = Logger()
+        
         if i2c_bus is None:
             i2c_bus = board.I2C()
+            
+        self.i2c_address = conf.get("adresses").get("AS7341", 0x39)  # Default I2C address for AS7341
         
-        self.sensor = AS7341(i2c_bus, address)
+        self.sensor = AS7341(i2c_bus, self.i2c_address)
         self.initialize_sensor()
 
     def initialize_sensor(self) -> None:
@@ -38,7 +45,7 @@ class SpectrumSensor:
             None
         """
         self.sensor.initialize()
-        print("AS7341 sensor initialized.")
+        self.logger.println("AS7341 sensor initialized.", "INFO")
     
     def read_channel(self, channel: str) -> int:
         """Reads the value of a specific channel.
@@ -65,8 +72,11 @@ class SpectrumSensor:
             "nir": self.sensor.channel_nir,
         }
         
-        if channel not in valid_channels:
-            raise ValueError(f"Invalid channel name: {channel}")
+        try:
+            if channel not in valid_channels:
+                raise ValueError(f"Invalid channel name: {channel}")
+        except ValueError as e:
+            self.logger.println(str(e), "ERROR")
         
         return valid_channels[channel]
 
@@ -101,7 +111,7 @@ class SpectrumSensor:
         """
         self.sensor.flicker_detection_enabled = enabled
         status = "enabled" if enabled else "disabled"
-        print(f"Flicker detection {status}.")
+        self.logger.println(f"Flicker detection {status}.", "INFO")
     
     def get_flicker_detection_status(self) -> Optional[int]:
         """Returns the current flicker detection frequency, if enabled.
@@ -110,8 +120,13 @@ class SpectrumSensor:
             int or None: The flicker frequency detected, or None if flicker detection is disabled.
         """
         if self.sensor.flicker_detection_enabled:
+            if self.sensor.flicker_detected:
+                self.logger.println(f"Flicker detected: {self.sensor.flicker_frequency} Hz", "INFO")
+            else:
+                self.logger.println("No flicker detected.", "INFO")
             return self.sensor.flicker_detected
         else:
+            self.logger.println("Flicker detection is disabled. Cannot get status", "WARNING")
             return None
 
     def set_led_current(self, current: int) -> None:
@@ -124,7 +139,7 @@ class SpectrumSensor:
             None
         """
         self.sensor.led_current = current
-        print(f"LED current set to {current}.")
+        self.logger.println(f"LED current set to {current}.", "INFO")
     
     def toggle_led(self, state: bool) -> None:
         """Toggles the LED on or off.
@@ -137,7 +152,7 @@ class SpectrumSensor:
         """
         self.sensor.led = state
         status = "on" if state else "off"
-        print(f"LED is turned {status}.")
+        self.logger.println(f"LED is turned {status}.", "INFO")
 
     def display_channel_readings(self, channels: List[str]) -> None:
         """Displays the readings for the specified channels.
@@ -151,9 +166,9 @@ class SpectrumSensor:
         for channel in channels:
             try:
                 reading = self.read_channel(channel)
-                print(f"{channel}: {reading}")
+                self.logger.println(f"{channel}: {reading}", "DEBUG")
             except ValueError as e:
-                print(e)
+                self.logger.println(str(e), "ERROR")
 
     def display_all_channel_readings(self) -> None:
         """Displays the readings for all channels.
@@ -168,7 +183,7 @@ class SpectrumSensor:
         readings = self.read_all_channels()
         
         for name, reading in zip(channel_names, readings):
-            print(f"{name}: {reading}")
+            self.logger.println(f"{name}: {reading}", "DEBUG")
 
 # # Example Usage:
 # if __name__ == "__main__":

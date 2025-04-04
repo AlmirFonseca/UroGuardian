@@ -4,7 +4,7 @@ import schedule
 from datetime import datetime
 from src.config_manager import ConfigManager
 from src.logger import Logger
-from src.database import Database
+from src.database import Database, DatabaseAPI
 from src.rtc import RTC
 from src.led import RGBLED
 from src.spectrum import SpectrumSensor
@@ -21,7 +21,7 @@ class Controller:
         self.rtc.sync_time()
 
         self.rgb_led = RGBLED(self.config)
-        self.sensor = SpectrumSensor()
+        self.sensor = SpectrumSensor(self.config)
         self.monitor = SystemMonitoring(self.db)
         
         self.collect_interval = self.config.get("conf")["collect_interval"]
@@ -29,6 +29,11 @@ class Controller:
         self.led_white_current = self.config.get("conf")["led_white_current"]
 
         self.is_paused = False
+        
+        # Inicializar API Flask para consulta remota
+        self.api = DatabaseAPI(self.db)
+        self.logger.println("Starting Flask API server for database. Access at: http://0.0.0.0:5000/data/demo_table", "INFO")
+        # self.api.run(host="0.0.0.0", port=5000)
 
         self.logger.println("Controller initialized successfully.", "INFO")
 
@@ -70,7 +75,7 @@ class Controller:
 
         collected_data.append({
             "timestamp": timestamp_white,
-            "led_color": "White",
+            "led_color": "W",
             "led_intensity": self.led_white_current,
             "readings": readings_white
         })

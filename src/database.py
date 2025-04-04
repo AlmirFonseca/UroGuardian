@@ -7,6 +7,7 @@ from flask import Flask, jsonify
 from typing import Any, Dict
 
 from src.config_manager import ConfigManager
+from src.logger import Logger
 
 class Database:
     """Class for managing the SQLite database with dynamic queries loaded from a YAML file.
@@ -38,12 +39,18 @@ class Database:
         self.cursor = self.connection.cursor()
 
         self.initialize_db()
+        
+        self.logger = Logger()
+        self.logger.println("Database initialized successfully.", "INFO")
 
     def load_queries(self) -> Dict[str, str]:
         """Load DDL and DML queries from the 'db_queries.yaml' configuration file.
 
         Returns:
             Dict[str, str]: Dictionary of queries.
+            
+        Raises:
+            FileNotFoundError: If the queries file doesn't exist.
         """
         queries_file = "../config/db_queries.yaml"
         if not os.path.exists(queries_file):
@@ -73,7 +80,7 @@ class Database:
         Returns:
             None
         """
-        print(f"Executing query: {query_key}")
+        self.logger.println(f"Executing query: {query_key}", "DEBUG")
         self.cursor.execute(query, params)
         self.connection.commit()
 
@@ -88,7 +95,7 @@ class Database:
         Returns:
             Any: The fetched result.
         """
-        print(f"Fetching one result for query: {query_key}")
+        self.logger.println(f"Fetching one result for query: {query_key}", "DEBUG")
         self.cursor.execute(query, params)
         return self.cursor.fetchone()
 
@@ -103,7 +110,7 @@ class Database:
         Returns:
             Any: The fetched results.
         """
-        print(f"Fetching all results for query: {query_key}")
+        self.logger.println(f"Fetching all results for query: {query_key}", "DEBUG")
         self.cursor.execute(query, params)
         return self.cursor.fetchall()
 
@@ -117,6 +124,9 @@ class Database:
         
         Returns:
             None
+            
+        Raises:
+            ValueError: If the query key is not found.
         """
         query = self.queries.get("dml", {}).get(query_key)
         if not query:
@@ -138,6 +148,9 @@ class Database:
 
         Returns:
             None
+            
+        Raises:
+            ValueError: If the query key is not found.
         """
         query = self.queries.get("dml", {}).get(query_key)
         if not query:
@@ -166,7 +179,7 @@ class Database:
 
         # Copy the database to the backup file
         shutil.copy(self.db_file, backup_file)
-        print(f"Backup created at: {backup_file}")
+        self.logger.println(f"Backup created at: {backup_file}", "INFO")
 
     def close(self) -> None:
         """Close the database connection.
@@ -175,6 +188,8 @@ class Database:
             None
         """
         self.connection.close()
+        
+        self.logger.println("Database connection closed.", "INFO")
 
 
 class DatabaseAPI:
@@ -198,6 +213,8 @@ class DatabaseAPI:
         """
         self.db = db
         self.app = Flask(__name__)
+        
+        self.logger = Logger()
 
         @self.app.route('/data/<table>', methods=['GET'])
         def get_data(table: str):
@@ -211,6 +228,18 @@ class DatabaseAPI:
             """
             data = self.db.fetch_all("fetch_data", f"SELECT * FROM {table}")
             return jsonify(data)
+        
+        # Define a function to print the available tables in the database
+        @self.app.route('/tables', methods=['GET'])
+        def list_tables():
+            """List all tables in the database.
+
+            Returns:
+                JSON: List of table names.
+            """
+            self.db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            tables = [row[0] for row in self.db.cursor.fetchall()]
+            return jsonify(tables)
 
     def run(self, host: str = "0.0.0.0", port: int = 5000) -> None:
         """Run the Flask API server.

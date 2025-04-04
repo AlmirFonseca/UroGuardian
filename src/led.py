@@ -47,13 +47,21 @@ class RGBLED:
         self.invert_logic = self.led_type == "common_anode"
         
         # Inicializa os LEDs com o brilho configurado
+        self.red_pwm = GPIO.PWM(self.red_pin, 1000)  # 1 kHz PWM
+        self.green_pwm = GPIO.PWM(self.green_pin, 1000)  # 1 kHz PWM
+        self.blue_pwm = GPIO.PWM(self.blue_pin, 1000)  # 1 kHz PWM
+
+        self.red_pwm.start(0)
+        self.green_pwm.start(0)
+        self.blue_pwm.start(0)
+
         self.set_color(self.brightness, self.brightness, self.brightness)
 
-    def _adjust_brightness(self, pin: int, brightness: int) -> None:
-        """Ajusta o brilho de um LED individual.
+    def _adjust_brightness(self, pwm_instance, brightness: int) -> None:
+        """Ajusta o brilho de um LED individual usando PWM.
         
         Args:
-            pin (int): O pino GPIO para o LED (R, G ou B).
+            pwm_instance (PWM instance): A instância do PWM do pino do LED.
             brightness (int): O valor de brilho (0 a 100%).
         
         Returns:
@@ -61,8 +69,10 @@ class RGBLED:
         """
         if self.invert_logic:
             brightness = 100 - brightness  # Inverte a lógica para anodo comum
-        pwm_duty = (brightness / 100) * 100  # Ajusta o brilho proporcional ao valor (0 a 100)
-        GPIO.output(pin, pwm_duty)
+        
+        # Ajusta o brilho proporcional ao valor (0 a 100)
+        pwm_duty = (brightness / 100) * 100  # Duty cycle de 0% a 100%
+        pwm_instance.ChangeDutyCycle(pwm_duty)
 
     def set_color(self, red: int, green: int, blue: int) -> None:
         """Define a cor do LED RGB com valores de brilho individuais para R, G e B.
@@ -75,9 +85,9 @@ class RGBLED:
         Returns:
             None
         """
-        self._adjust_brightness(self.red_pin, red)
-        self._adjust_brightness(self.green_pin, green)
-        self._adjust_brightness(self.blue_pin, blue)
+        self._adjust_brightness(self.red_pwm, red)
+        self._adjust_brightness(self.green_pwm, green)
+        self._adjust_brightness(self.blue_pwm, blue)
 
     def set_individual_color(self, color: str, brightness: int) -> None:
         """Define o brilho de uma cor individualmente (R, G ou B).
@@ -93,11 +103,11 @@ class RGBLED:
             ValueError: Se a cor fornecida não for válida.
         """
         if color == 'R':
-            self._adjust_brightness(self.red_pin, brightness)
+            self._adjust_brightness(self.red_pwm, brightness)
         elif color == 'G':
-            self._adjust_brightness(self.green_pin, brightness)
+            self._adjust_brightness(self.green_pwm, brightness)
         elif color == 'B':
-            self._adjust_brightness(self.blue_pin, brightness)
+            self._adjust_brightness(self.blue_pwm, brightness)
         else:
             raise ValueError("Cor inválida. Use 'R', 'G' ou 'B'.")
 
@@ -121,4 +131,7 @@ class RGBLED:
         Returns:
             None
         """
+        self.red_pwm.stop()
+        self.green_pwm.stop()
+        self.blue_pwm.stop()
         GPIO.cleanup()

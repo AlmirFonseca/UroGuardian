@@ -4,8 +4,11 @@ import os
 from hx711 import HX711
 from typing import Tuple, Optional
 from datetime import datetime
-from config_manager import ConfigManager
-from database import Database
+
+
+from src.config_manager import ConfigManager
+from src.logger import Logger
+from src.database import Database
 
 class LoadCell:
     """Wrapper class to interface with the HX711 module and load cell.
@@ -32,8 +35,8 @@ class LoadCell:
         """
         # Read pin configurations from config/pins.yaml using ConfigManager
         pins = config_manager.get("pins")
-        dt_pin = pins.get("DT")  # Data pin for HX711
-        sck_pin = pins.get("SCK")  # Clock pin for HX711
+        dt_pin = pins.get("LOADCELL_DT")  # Data pin for HX711
+        sck_pin = pins.get("LOADCELL_SCK")  # Clock pin for HX711
         
         # Initialize HX711 object
         self.hx711 = HX711(dout=dt_pin, pd_sck=sck_pin)
@@ -45,6 +48,10 @@ class LoadCell:
         
         # Load calibration data from the database
         self.load_calibration_from_db()
+        
+        # Initialize the logger
+        self.logger = Logger()
+        self.logger.println("LoadCell initialized successfully.", "INFO")
 
     def tare(self) -> None:
         """Tares the load cell (sets the current reading to zero).
@@ -65,7 +72,7 @@ class LoadCell:
             "tare_offset": self.tare_offset
         }
         self.db.insert_data("insert_data_tare_log", "tare_log", tare_data)
-        print(f"Scale tared. Current tare offset: {self.tare_offset} at {timestamp}")
+        self.logger.println(f"Scale tared. Current tare offset: {self.tare_offset} at {timestamp}", "INFO")
     
     def calibrate_two_point(self, weight1: float, reading1: float, weight2: float, reading2: float) -> None:
         """Calibrate the load cell using two known weights and their corresponding readings.
@@ -97,7 +104,7 @@ class LoadCell:
         
         # Update calibration data in the database
         self.update_calibration_in_db(timestamp, self.calibration_factor, self.tare_offset)
-        print(f"Calibration successful. Calibration factor: {self.calibration_factor} at {timestamp}")
+        self.logger.println(f"Calibration successful. Calibration factor: {self.calibration_factor} at {timestamp}", "INFO")
     
     def read_weight(self) -> float:
         """Reads the current weight from the load cell, applying the calibration factor.
@@ -108,6 +115,9 @@ class LoadCell:
         raw_data = self.hx711.get_value(5)
         weight = raw_data * self.calibration_factor
         weight -= self.tare_offset  # Apply tare offset
+        
+        self.logger.println(f"Raw data: {raw_data}, Weight: {weight} grams", "DEBUG")
+        
         return weight
     
     def get_raw_data(self) -> int:
@@ -137,7 +147,8 @@ class LoadCell:
             "tare_offset": tare_offset
         }
         self.db.update_data("update_calibration_data", "calibration_data", calibration_data, f"timestamp = '{timestamp}'")
-        print(f"Calibration data updated at {timestamp}")
+        self.logger.println(f"Calibration data updated at {timestamp}", "INFO")
+        self.logger.println(f"Calibration factor: {calibration_factor}, Tare offset: {tare_offset}", "DEBUG")
     
     def load_calibration_from_db(self) -> None:
         """Loads the most recent calibration data from the database.
@@ -152,9 +163,9 @@ class LoadCell:
         if result:
             self.calibration_factor = result[2]  # Assuming calibration_factor is the 3rd column
             self.tare_offset = result[3]  # Assuming tare_offset is the 4th column
-            print("Calibration data loaded successfully from the database.")
+            self.logger.println("Calibration data loaded successfully from the database.", "INFO")
         else:
-            print("No calibration data found in the database. Using default calibration.")
+            self.logger.println("No calibration data found in the database. Using default calibration.", "WARNING")
 
 # # Example Usage
 # if __name__ == "__main__":

@@ -1,5 +1,5 @@
 ddl:
-  create_table_system_monitoring: "CREATE TABLE IF NOT EXISTS system_monitoring (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, cpu_usage REAL, ram_usage REAL, power_usage REAL, disk_usage REAL, network_usage REAL, wifi_ssid TEXT, wifi_signal_strength REAL)"
+  create_table_system_monitoring: "CREATE TABLE IF NOT EXISTS system_monitoring (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, cpu_usage REAL, cpu_temp REAL, ram_usage REAL, disk_usage REAL, network_usage REAL, wifi_ssid TEXT, wifi_signal_strength REAL)"
   create_table_calibration_data: "CREATE TABLE IF NOT EXISTS calibration_data (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, calibration_factor REAL, tare_offset REAL)"
   create_table_tare_log: "CREATE TABLE IF NOT EXISTS tare_log (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, tare_offset REAL)"
   create_table_spectrum_readings: "CREATE TABLE IF NOT EXISTS spectrum_readings (
@@ -9,8 +9,8 @@ ddl:
       led_intensity INTEGER,
       channel_readings TEXT)"
 dml:
-  insert_data_system_monitoring: "INSERT INTO system_monitoring (timestamp, cpu_usage, ram_usage, power_usage, disk_usage, network_usage, wifi_ssid, wifi_signal_strength) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  update_data_system_monitoring: "UPDATE system_monitoring SET cpu_usage = ?, ram_usage = ?, power_usage = ?, disk_usage = ?, network_usage = ?, wifi_ssid = ?, wifi_signal_strength = ? WHERE id = ?"
+  insert_data_system_monitoring: "INSERT INTO system_monitoring (timestamp, cpu_usage, cpu_temp, ram_usage, disk_usage, network_usage, wifi_ssid, wifi_signal_strength) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  update_data_system_monitoring: "UPDATE system_monitoring SET cpu_usage = ?, cpu_temp = ?, ram_usage = ?, disk_usage = ?, network_usage = ?, wifi_ssid = ?, wifi_signal_strength = ? WHERE id = ?"
   insert_data_calibration_log: "INSERT INTO calibration_data (timestamp, calibration_factor, tare_offset) VALUES (?, ?, ?)"
   insert_data_tare_log: "INSERT INTO tare_log (timestamp, tare_offset) VALUES (?, ?)"
   update_calibration_data: "UPDATE calibration_data SET calibration_factor = ?, tare_offset = ? WHERE timestamp = ?"

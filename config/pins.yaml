@@ -1,3 +1,18 @@
-LED_R: 17
-LED_G: 27
-LED_B: 22
+# RGB LED pin configuration
+LED_R: 12
+LED_G: 13
+LED_B: 19
+
+# IR LED pin configuration
+LED_IR: 18
+
+# 5-directional joystick pin configuration
+JOYSTICK_UP: 17
+JOYSTICK_DOWN: 27
+JOYSTICK_LEFT: 22
+JOYSTICK_RIGHT: 23
+JOYSTICK_PRESS: 24
+
+# HX711 - Load cell pin configuration
+LOADCELL_DT: 5
+LOADCELL_SCK: 6

@@ -1,0 +1,3 @@
+AS7341:  0x39 # Endereço I2C do AS7341 (Spectrômetro)
+
+ADS1115: 0x48  # Endereço I2C do ADS1115 (ADC)

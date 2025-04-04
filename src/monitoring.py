@@ -7,6 +7,7 @@ from typing import Tuple
 import subprocess
 
 from src.database import Database
+from src.logger import Logger
 
 
 class SystemMonitoring:
@@ -28,6 +29,8 @@ class SystemMonitoring:
         """
         self.db = db
         self.time_interval = time_interval
+        self.logger = Logger()
+        self.logger.println("System Monitoring initialized.", "INFO")
 
     def get_cpu_usage(self) -> float:
         """Get the current CPU usage as a percentage.
@@ -36,6 +39,24 @@ class SystemMonitoring:
             float: The current CPU usage in percentage.
         """
         return psutil.cpu_percent(interval=1)
+    
+    def get_cpu_temp(self) -> Optional[float]:
+        """Get the current CPU temperature in Celsius.
+        
+        Returns:
+            float: The current CPU temperature in Celsius.
+            
+        Raises:
+            FileNotFoundError: If the temperature file is not found.
+        """
+        # Assuming the CPU temperature is available at /sys/class/thermal/thermal_zone0/temp
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                temp = f.read()
+                return round(float(temp) / 1000.0, 2)  # Convert to Celsius
+        except FileNotFoundError:
+            self.logger.println("CPU temperature file not found.", "ERROR")
+            return None
 
     def get_ram_usage(self) -> float:
         """Get the current RAM usage as a percentage.
@@ -46,14 +67,14 @@ class SystemMonitoring:
         memory = psutil.virtual_memory()
         return memory.percent
 
-    def get_power_usage(self) -> Optional[float]:
-        """Get the current power consumption. This would depend on your setup.
+    # def get_power_usage(self) -> Optional[float]:
+    #     """Get the current power consumption. This would depend on your setup.
         
-        Placeholder method for power consumption. You could use external hardware to measure power.
-        Returns `None` if not available.
-        """
-        # Placeholder for actual power measurement
-        return None
+    #     Placeholder method for power consumption. You could use external hardware to measure power.
+    #     Returns `None` if not available.
+    #     """
+    #     # Placeholder for actual power measurement
+    #     return None
 
     def get_disk_usage(self) -> float:
         """Get the current disk usage as a percentage.
@@ -97,7 +118,24 @@ class SystemMonitoring:
                 return ssid, signal_strength_db
             return None
         except Exception as e:
-            print(f"Error fetching Wi-Fi details: {e}")
+            self.logger.println(f"Error fetching Wi-Fi details: {e}", "ERROR")
+            return None
+        
+    def extract_signal_strength(self, iwconfig_output: str) -> Optional[float]:
+        """Extract the signal strength (in dB) from the iwconfig output.
+        
+        Raises:
+            ValueError: If the signal strength cannot be extracted.
+        """
+        try:
+            # This is an example, your output format may vary
+            line = [line for line in iwconfig_output.splitlines() if 'Signal level' in line]
+            if line:
+                signal_strength = line[0].split('Signal level=')[1].split(' dBm')[0]
+                return float(signal_strength)
+            return None
+        except Exception as e:
+            self.logger.println(f"Error extracting signal strength: {e}", "ERROR")
             return None
 
     def collect_and_store_data(self) -> None:
@@ -112,8 +150,9 @@ class SystemMonitoring:
         
         # Collect system usage data
         cpu_usage = self.get_cpu_usage()
+        cpu_temp = self.get_cpu_temp()
         ram_usage = self.get_ram_usage()
-        power_usage = self.get_power_usage()
+        # power_usage = self.get_power_usage() # To be implemented
         disk_usage = self.get_disk_usage()
         network_usage = self.get_network_usage()
 
@@ -125,8 +164,9 @@ class SystemMonitoring:
         data = {
             "timestamp": timestamp,
             "cpu_usage": cpu_usage,
+            "cpu_temp": cpu_temp,
             "ram_usage": ram_usage,
-            "power_usage": power_usage,
+            # "power_usage": power_usage,
             "disk_usage": disk_usage,
             "network_usage": network_usage,
             "wifi_ssid": ssid,
@@ -136,16 +176,18 @@ class SystemMonitoring:
         # Insert data into the 'system_monitoring' table using query key
         try:
             self.db.insert_data("insert_data_system_monitoring", "system_monitoring", data)
-            print(f"Data collected and stored at {timestamp}")
+            self.logger.println(f"Data collected and stored at {timestamp}", "INFO")
         except ValueError as e:
-            print(f"Error inserting data: {e}")
+            self.logger.println(f"Error inserting data: {e}", "ERROR")
+        except Exception as e:
+            self.logger.println(f"Unexpected error while inserting data: {e}", "ERROR")
 
     def start_monitoring(self) -> None:
         """Start the monitoring process with the given time interval, using a scheduling library."""
         # Schedule the task to run at specified intervals
         schedule.every(self.time_interval).seconds.do(self.collect_and_store_data)
 
-        print(f"Monitoring started with {self.time_interval}-second interval.")
+        self.logger.println(f"Monitoring started with {self.time_interval}-second interval.", "INFO")
         
         # Run the scheduled tasks in a non-blocking way
         while True:
