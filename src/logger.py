@@ -1,12 +1,13 @@
 from typing import Optional
 from src.config_manager import ConfigManager
+from colorama import Fore, init
 
 
 class Logger:
     """Classe para registro de mensagens com controle de níveis de debug.
 
     Permite segmentação em níveis (DEBUG, INFO, WARNING, ERROR, FATAL, LOG, EXCEPTION, VERBOSE) e a 
-    utilização de tags de três letras.
+    utilização de tags de três letras, com cores para representar diferentes níveis de log.
     O nível de debug inicial é obtido a partir do arquivo de configuração YAML.
 
     Attributes:
@@ -27,15 +28,27 @@ class Logger:
     }
 
     TAGS = {
-        0: "VRB",
-        1: "DBG",
-        2: "INF",
-        3: "LOG",
-        4: "WRN",
-        5: "ERR",
-        6: "EXC",
-        7: "FTL",
-        8: "OFF"
+        0: "VRB",  # VERBOSE
+        1: "DBG",  # DEBUG
+        2: "INF",  # INFO
+        3: "LOG",  # LOG
+        4: "WRN",  # WARNING
+        5: "ERR",  # ERROR
+        6: "EXC",  # EXCEPTION
+        7: "FTL",  # FATAL
+        8: "OFF"   # OFF
+    }
+
+    COLORS = {
+        0: Fore.CYAN,      # VERBOSE
+        1: Fore.GREEN,     # DEBUG
+        2: Fore.WHITE,     # INFO
+        3: Fore.YELLOW,    # LOG
+        4: Fore.MAGENTA,   # WARNING
+        5: Fore.RED,       # ERROR
+        6: Fore.RED,       # EXCEPTION
+        7: Fore.RED,       # FATAL
+        8: Fore.BLACK      # OFF (no color)
     }
 
     def __init__(self, config_path: str = "config/logging.yaml") -> None:
@@ -79,8 +92,9 @@ class Logger:
         msg_level = self.LEVELS.get(level.upper(), 2)
         if msg_level >= self.level:
             tag = self.TAGS[msg_level] if (self.show_tag if show_tag is None else show_tag) else ""
-            formatted_message = f"[{tag}] {message}" if tag else message
-            print(formatted_message, end="")
+            color = self.COLORS[msg_level]
+            formatted_message = f"{color}[{tag}] {message}" if tag else f"{color}{message}"
+            print(formatted_message, end=f"{Fore.RESET}")
 
     def println(self, message: str, level: str = "INFO", show_tag: Optional[bool] = None) -> None:
         """Exibe uma mensagem seguida de nova linha.

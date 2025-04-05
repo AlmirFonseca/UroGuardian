@@ -7,3 +7,4 @@ ntplib==0.4.0
 psutil==5.9.6
 PyYAML==6.0.2
 schedule==1.2.2
+colorama==0.4.6
