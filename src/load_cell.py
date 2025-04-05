@@ -67,11 +67,12 @@ class LoadCell:
         
         # Log tare action in the database with timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        tare_data = {
+        calibration_data = {
             "timestamp": timestamp,
+            "calibration_factor": self.calibration_factor,
             "tare_offset": self.tare_offset
         }
-        self.db.insert_data("insert_data_tare_log", "tare_log", tare_data)
+        self.db.insert_data("insert_data_calibration_log", "calibration_data", calibration_data)
         self.logger.println(f"Scale tared. Current tare offset: {self.tare_offset} at {timestamp}", "INFO")
     
     def calibrate_two_point(self, weight1: float, reading1: float, weight2: float, reading2: float) -> None:
