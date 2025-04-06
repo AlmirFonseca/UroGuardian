@@ -26,12 +26,13 @@ class SpectrumSensor:
         Returns:
             None
         """
+        self.conf = conf
         self.logger = Logger()
         
         if i2c_bus is None:
             i2c_bus = board.I2C()
             
-        self.i2c_address = conf.get("adresses").get("AS7341", 0x39)  # Default I2C address for AS7341
+        self.i2c_address = self.conf.get("adresses").get("AS7341", 0x39)  # Default I2C address for AS7341
         
         self.sensor = AS7341(i2c_bus, self.i2c_address)
         self.initialize_sensor()
@@ -80,25 +81,25 @@ class SpectrumSensor:
         
         return valid_channels[channel]
 
-    def read_all_channels(self) -> Tuple[int, int, int, int, int, int, int, int, int, int]:
+    def read_all_channels(self) -> dict:
         """Reads the values from all channels.
 
         Returns:
-            tuple: A tuple containing the readings for each channel in order:
-                (415nm, 445nm, 480nm, 515nm, 555nm, 590nm, 630nm, 680nm, clear, NIR)
+            dict: A dictionary containing the readings for each channel with keys in the format:
+                {"channel_415nm": value, "channel_445nm": value, ..., "channel_nir": value}
         """
-        return (
-            self.sensor.channel_415nm,
-            self.sensor.channel_445nm,
-            self.sensor.channel_480nm,
-            self.sensor.channel_515nm,
-            self.sensor.channel_555nm,
-            self.sensor.channel_590nm,
-            self.sensor.channel_630nm,
-            self.sensor.channel_680nm,
-            self.sensor.channel_clear,
-            self.sensor.channel_nir,
-        )
+        return {
+            "channel_415nm": self.sensor.channel_415nm,
+            "channel_445nm": self.sensor.channel_445nm,
+            "channel_480nm": self.sensor.channel_480nm,
+            "channel_515nm": self.sensor.channel_515nm,
+            "channel_555nm": self.sensor.channel_555nm,
+            "channel_590nm": self.sensor.channel_590nm,
+            "channel_630nm": self.sensor.channel_630nm,
+            "channel_680nm": self.sensor.channel_680nm,
+            "channel_clear": self.sensor.channel_clear,
+            "channel_nir": self.sensor.channel_nir,
+        }
 
     def enable_flicker_detection(self, enabled: bool = True) -> None:
         """Enables or disables flicker detection.
