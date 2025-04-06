@@ -1,18 +1,350 @@
+
+# DDL - Data Definition Language (Criação e Estrutura das Tabelas)
 ddl:
-  create_table_system_monitoring: "CREATE TABLE IF NOT EXISTS system_monitoring (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, cpu_usage REAL, cpu_temp REAL, ram_usage REAL, disk_usage REAL, network_usage REAL, wifi_ssid TEXT, wifi_signal_strength REAL)"
-  create_table_calibration_data: "CREATE TABLE IF NOT EXISTS calibration_data (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, calibration_factor REAL, tare_offset REAL)"
-  create_table_tare_log: "CREATE TABLE IF NOT EXISTS tare_log (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, tare_offset REAL)"
-  create_table_spectrum_readings: "CREATE TABLE IF NOT EXISTS spectrum_readings (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp TEXT,
-      led_color TEXT,
-      led_intensity INTEGER,
-      channel_readings TEXT)"
+
+  # ----------------------------------------
+  # Tabela de dispositivos
+  # ----------------------------------------
+
+  create_table_device: |
+    CREATE TABLE IF NOT EXISTS device (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,                   -- ID único do dispositivo
+      mac_address TEXT UNIQUE,                                -- Endereço MAC do dispositivo
+      name TEXT,                                              -- Nome do dispositivo (ex: "Sensor de Urina")
+      version TEXT,                                           -- Versão do dispositivo (ex: "1.0")
+      ip_address TEXT,                                        -- Endereço IP do dispositivo
+      status TEXT CHECK (status in ('active', 'inactive')),   -- Status do dispositivo (ativo ou inativo)
+      last_update TEXT                                        -- Data e hora da última atualização
+    )
+
+  # ----------------------------------------
+  # Tabela de controle manual de pacientes
+  # ----------------------------------------
+
+  # Tabela para armazenar os dados de controle manual dos pacientes
+  create_table_patient: |
+    CREATE TABLE IF NOT EXISTS patient (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,                          -- ID único do paciente
+      gender TEXT CHECK (gender in ('M', 'F', 'Other')),             -- Gênero do paciente (M ou F)
+      age INTEGER CHECK (age >= 0),                                  -- Idade do paciente em anos
+      height REAL CHECK (height >= 0),                               -- Altura do paciente em cm
+      weight REAL CHECK (weight >= 0),                               -- Peso do paciente em kg
+      renal_conditions TEXT,                                         -- Complicações renais associadas (caso existam)
+      room TEXT,                                                     -- Apartamento do paciente (ex: "A1", "B2")
+      bed TEXT,                                                      -- Leito do paciente (ex: "Leito 1", "Leito 2")
+      observations TEXT,                                              -- Observações adicionais sobre o paciente
+      urine_bag_usage_start_time TEXT,                               -- Hora de início do uso da bolsa de urina
+      urine_bag_usage_end_time TEXT,                                 -- Hora de término do uso da bolsa de urina
+      device_usage_start_time TEXT,                                  -- Hora de início do uso do dispositivo
+      device_usage_end_time TEXT                                    -- Hora de término do uso do dispositivo
+    )
+
+  # ----------------------------------------
+  # Tabela de tipos de bolsa de urina
+  # ----------------------------------------
+
+  create_table_urine_bag_type: |
+    CREATE TABLE IF NOT EXISTS urine_bag_type (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,        -- ID único do tipo de bolsa de urina
+      brand TEXT,                                  -- Marca da bolsa de urina
+      type TEXT,                                   -- Tipo da bolsa de urina (ex: "Pediátrica", "Adulto")
+      max_capacity REAL CHECK (max_capacity > 0)  -- Capacidade máxima da bolsa de urina em mL
+    )
+
+  # ----------------------------------------
+  # Tabela de instância virtual da bolsa de urina
+  # ----------------------------------------
+
+  create_table_urine_bag: |
+    CREATE TABLE IF NOT EXISTS urine_bag (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,                          -- ID único da bolsa de urina
+      device_id INTEGER,                                             -- ID do dispositivo (relacionamento com a tabela device)
+      patient_id INTEGER,                                            -- ID do paciente (relacionamento com a tabela paciente)
+      urine_bag_type_id INTEGER,                                     -- ID do tipo de bolsa de urina (relacionamento com a tabela urine_bag_type)
+      status TEXT CHECK (status in ('active', 'inactive')),          -- Status da bolsa de urina (ativa ou inativa)
+      start_time TEXT,                                               -- Hora de início do uso da bolsa de urina
+      end_time TEXT,                                                 -- Hora de término do uso da bolsa de urina
+      FOREIGN KEY (device_id) REFERENCES device(id),                 -- Relacionamento com a tabela de dispositivos
+      FOREIGN KEY (patient_id) REFERENCES patient(id),               -- Relacionamento com a tabela de paciente
+      FOREIGN KEY (urine_bag_type_id) REFERENCES urine_bag_type(id)  -- Relacionamento com a tabela de tipos de bolsa de urina
+    )
+
+  # ----------------------------------------
+  # Tabela de monitoramento da bolsa de urina
+  # ----------------------------------------
+
+  create_table_urine_bag_monitoring: |
+    CREATE TABLE IF NOT EXISTS urine_bag_monitoring (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,                          -- ID único do monitoramento
+      urine_bag_id INTEGER,                                          -- ID da bolsa de urina (relacionamento com a tabela urine_bag)
+      timestamp TEXT,                                                -- Data e hora do monitoramento
+      urine_volume REAL,                                             -- Volume de urina na bolsa em mL
+      urine_color TEXT,                                              -- Cor da urina
+      urine_hidration_level TEXT,                                    -- Nível de hidratação (ex: "Baixo", "Normal", "Alto")
+      FOREIGN KEY (urine_bag_id) REFERENCES urine_bag(id)            -- Relacionamento com a tabela de bolsas de urina
+    )
+
+  # ----------------------------------------
+  # Tabela de log de alertas e notificações
+  # ----------------------------------------
+
+  create_table_alert_log: |
+    CREATE TABLE IF NOT EXISTS alert_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,                                         -- ID único do alerta
+      urine_bag_monitoring_id INTEGER,                                              -- ID do monitoramento da bolsa de urina (relacionamento com a tabela urine_bag_monitoring)
+      timestamp TEXT,                                                               -- Data e hora do alerta
+      alert_type TEXT,                                                              -- Tipo de alerta (ex: "Volume Baixo", "Cor Anormal")
+      alert_message TEXT,                                                           -- Mensagem do alerta
+      FOREIGN KEY (urine_bag_monitoring_id) REFERENCES urine_bag_monitoring_id(id)  -- Relacionamento com a tabela de monitoramento da bolsa de urina
+    )
+
+  # ----------------------------------------
+  # Tabelas relacionadas ao monitoramento do sistema
+  # ----------------------------------------
+
+  # Tabela para armazenar os dados do monitoramento do sistema (uso de CPU, RAM, rede, etc.)
+  create_table_system_monitoring: |
+    CREATE TABLE IF NOT EXISTS system_monitoring (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Identificador único
+      timestamp TEXT,                        -- Data e hora do registro
+      cpu_usage REAL,                        -- Percentual de uso da CPU
+      cpu_temp REAL,                         -- Temperatura da CPU
+      ram_usage REAL,                        -- Percentual de uso de RAM
+      disk_usage REAL,                       -- Percentual de uso do disco
+      network_usage REAL,                    -- Uso de rede (em MB/s)
+      wifi_ssid TEXT,                        -- SSID da rede Wi-Fi conectada
+      wifi_signal_strength REAL              -- Força do sinal Wi-Fi (em dBm)
+    )
+
+  # ----------------------------------------
+  # Tabelas relacionadas calibracao da celula de carga
+  # ----------------------------------------
+
+  # Tabela para armazenar os dados de calibração de sensores (fator de calibração e offset)
+  create_table_load_cell_calibration_data: |
+    CREATE TABLE IF NOT EXISTS load_cell_calibration_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Identificador único
+      timestamp TEXT,                        -- Data e hora da calibração
+      calibration_factor REAL,               -- Fator de calibração
+      tare_offset REAL                       -- Offset de tara
+    )
+
+  # ----------------------------------------
+  # Tabelas relacionadas a leituras de espectro
+  # ----------------------------------------
+
+  # Tabela para armazenar as leituras do espectro (dados de canais do sensor de cores e configurações de LED)
+  create_table_spectrum_data: |
+    CREATE TABLE IF NOT EXISTS spectrum_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,     -- Identificador único
+      sample_id INTEGER,                        -- ID da amostra de dados (relacionamento com a tabela sample_data)
+      timestamp TEXT,                           -- Data e hora da leitura
+      batch INTEGER,                            -- ID do lote de amostras (1, 2, 3, ...)
+      led_color TEXT,                           -- Cor do LED utilizado na medição (ex: "R" (red), "G" (green), "B" (blue), "W" (white), "IR" (infrared), "UV" (ultraviolet))
+      led_intensity INTEGER,                    -- Intensidade do LED (0-100%)
+      channel_415nm INTEGER,                    -- Leitura do canal de 415nm
+      channel_445nm INTEGER,                    -- Leitura do canal de 445nm
+      channel_480nm INTEGER,                    -- Leitura do canal de 480nm
+      channel_515nm INTEGER,                    -- Leitura do canal de 515nm
+      channel_555nm INTEGER,                    -- Leitura do canal de 555nm
+      channel_590nm INTEGER,                    -- Leitura do canal de 590nm
+      channel_630nm INTEGER,                    -- Leitura do canal de 630nm
+      channel_680nm INTEGER,                    -- Leitura do canal de 680nm
+      channel_clear INTEGER,                    -- Leitura do canal clear
+      channel_nir INTEGER                       -- Leitura do canal near-infrared (NIR)
+      FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
+    )
+
+  # Tabela para armazenar os dados das leituras da célula de carga (peso)
+  create_table_load_cell_data: |
+    CREATE TABLE IF NOT EXISTS load_cell_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Identificador único
+      sample_id INTEGER,                     -- ID da amostra de dados (relacionamento com a tabela sample_data)
+      timestamp TEXT,                        -- Data e hora da leitura
+      batch INTEGER,                         -- ID do lote de amostras (1, 2, 3, ...)
+      weight REAL,                           -- Peso medido pela célula de carga
+      tare_offset REAL,                      -- Offset de tara utilizado na leitura
+      calibration_factor REAL                -- Fator de calibração utilizado
+      FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
+    )
+
+  # ----------------------------------------
+  # Tabela para momentos de amostragem
+  # ----------------------------------------
+
+  create_table_samples: |
+    CREATE TABLE IF NOT EXISTS samples (
+      sample_id INTEGER PRIMARY KEY AUTOINCREMENT,              -- ID único da amostra
+      urine_bag_id INTEGER,                                     -- ID da bolsa de urina (relacionamento com a tabela urine_bag)
+      start_timestamp TEXT,                                     -- Data e hora de início da amostragem
+      end_timestamp TEXT,                                       -- Data e hora de término da amostragem
+      FOREIGN KEY (urine_bag_id) REFERENCES urine_bag(id)       -- Relacionamento com a tabela de bolsas de urina
+    )
+
+  # ----------------------------------------
+  # Tabela para log de erros
+  # ----------------------------------------
+
+  create_table_logs: |
+    CREATE TABLE IF NOT EXISTS logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID único do erro
+      timestamp TEXT,                        -- Data e hora do erro
+      error_code TEXT,                       -- Código do erro
+      error_message TEXT                     -- Mensagem de erro
+    )
+
+
+
+
 dml:
-  insert_data_system_monitoring: "INSERT INTO system_monitoring (timestamp, cpu_usage, cpu_temp, ram_usage, disk_usage, network_usage, wifi_ssid, wifi_signal_strength) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  update_data_system_monitoring: "UPDATE system_monitoring SET cpu_usage = ?, cpu_temp = ?, ram_usage = ?, disk_usage = ?, network_usage = ?, wifi_ssid = ?, wifi_signal_strength = ? WHERE id = ?"
-  insert_data_calibration_log: "INSERT INTO calibration_data (timestamp, calibration_factor, tare_offset) VALUES (?, ?, ?)"
-  insert_data_tare_log: "INSERT INTO tare_log (timestamp, tare_offset) VALUES (?, ?)"
-  update_calibration_data: "UPDATE calibration_data SET calibration_factor = ?, tare_offset = ? WHERE timestamp = ?"
-  fetch_latest_calibration: "SELECT * FROM calibration_data ORDER BY timestamp DESC LIMIT 1"
-  insert_spectrum_readings: "INSERT INTO {table} ({columns}) VALUES ({placeholders})"
+
+  # ----------------------------------------
+  # DML - Data Manipulation Language (Queries de Inserção)
+  # ----------------------------------------
+
+  # Tabela de dispositivos
+  insert_device: |
+    INSERT INTO device (mac_address, name, version, ip_address, status, last_update)
+    VALUES (?, ?, ?, ?, ?, ?)
+
+  # Tabela de controle manual de pacientes
+  insert_patient: |
+    INSERT INTO patient (
+      gender, age, height, weight, renal_conditions, room, bed, observations, 
+      urine_bag_usage_start_time, urine_bag_usage_end_time, 
+      device_usage_start_time, device_usage_end_time
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de tipos de bolsa de urina
+  insert_urine_bag_type: |
+    INSERT INTO urine_bag_type (brand, type, max_capacity)
+    VALUES (?, ?, ?)
+
+  # Tabela de instância virtual da bolsa de urina
+  insert_urine_bag: |
+    INSERT INTO urine_bag (device_id, patient_id, urine_bag_type_id, status, start_time, end_time)
+    VALUES (?, ?, ?, ?, ?, ?)
+
+  # Tabela de monitoramento da bolsa de urina
+  insert_urine_bag_monitoring: |
+    INSERT INTO urine_bag_monitoring (urine_bag_id, timestamp, urine_volume, urine_color, urine_hidration_level)
+    VALUES (?, ?, ?, ?, ?)
+
+  # Tabela de log de alertas e notificações
+  insert_alert_log: |
+    INSERT INTO alert_log (urine_bag_monitoring_id, timestamp, alert_type, alert_message)
+    VALUES (?, ?, ?, ?)
+
+  # Tabela de monitoramento do sistema
+  insert_system_monitoring: |
+    INSERT INTO system_monitoring (timestamp, cpu_usage, cpu_temp, ram_usage, disk_usage, network_usage, wifi_ssid, wifi_signal_strength)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de calibração da célula de carga
+  insert_load_cell_calibration_data: |
+    INSERT INTO load_cell_calibration_data (timestamp, calibration_factor, tare_offset)
+    VALUES (?, ?, ?)
+
+  # Tabela de leituras de espectro
+  insert_spectrum_data: |
+    INSERT INTO spectrum_data (
+      sample_id, timestamp, batch, led_color, led_intensity, channel_415nm, channel_445nm, channel_480nm, channel_515nm, 
+      channel_555nm, channel_590nm, channel_630nm, channel_680nm, channel_clear, channel_nir
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de leituras da célula de carga
+  insert_load_cell_data: |
+    INSERT INTO load_cell_data (sample_id, timestamp, batch, weight, tare_offset, calibration_factor)
+    VALUES (?, ?, ?, ?, ?, ?)
+
+  # Tabela de amostras
+  insert_samples: |
+    INSERT INTO samples (urine_bag_id, start_timestamp, end_timestamp)
+    VALUES (?, ?, ?)
+
+  # Tabela de logs de erro
+  insert_log: |
+    INSERT INTO logs (timestamp, error_code, error_message)
+    VALUES (?, ?, ?)
+
+
+
+
+mock:
+
+  # ----------------------------------------
+  # Queries de População - Dispositivo
+  # ----------------------------------------
+  populate_mock_device: |
+    INSERT INTO device (mac_address, name, version, ip_address, status, last_update)
+    SELECT  '00:B0:D0:63:C2:26', 'UroGuardian MVP', '0.0.1', '192.168.0.168', 'active', '2025-03-30 08:00:00'
+    WHERE NOT EXISTS (SELECT 1 FROM device)
+
+  # ----------------------------------------
+  # Queries de População - Tipo de bolsa de urina
+  # ----------------------------------------
+  populate_mock_urine_bag_type: |
+    INSERT INTO urine_bag_type (brand, type, max_capacity)
+    SELECT 'Descarpack', 'Sistema Fechado', 2000
+    WHERE NOT EXISTS (SELECT 1 FROM urine_bag_type)
+
+  # ----------------------------------------
+  # Queries de População - Tabelas de Controle de Pacientes
+  # ----------------------------------------
+  populate_mock_patient: |
+    INSERT INTO patient (
+      gender, age, height, weight, renal_conditions, room, bed, observations, 
+      urine_bag_usage_start_time, device_usage_start_time)
+    SELECT 
+      'M', 55, 175, 72, 'Hipertensão', 'A1', 'Leito 1', 'Paciente em tratamento de pressão alta',
+      '2025-03-30 08:00:00', '2025-03-30 08:00:00'
+    WHERE NOT EXISTS (SELECT 1 FROM patient)
+
+  # ----------------------------------------
+  # Queries de População - Bolsa de Urina
+  # ----------------------------------------
+  populate_mock_urine_bag: |
+    INSERT INTO urine_bag (device_id, patient_id, urine_bag_type_id, status, start_time, end_time)
+    SELECT 1, 1, 1, 'active', '2025-03-30 08:00:00', ''
+    WHERE NOT EXISTS (SELECT 1 FROM urine_bag)
+
+
+
+
+fetch:
+
+  # fetch_data: |
+  #   SELECT * FROM {table} 
+  #   WHERE {condition} 
+  #   ORDER BY {order_by} 
+  #   LIMIT {limit}
+
+  fetch_device: |
+    SELECT * FROM device 
+    WHERE status = 'active'
+    ORDER BY last_update DESC 
+    LIMIT 1
+
+  fetch_current_urine_bag: |
+    SELECT * FROM urine_bag 
+    WHERE status = 'active' & 
+          device_id = ? 
+    ORDER BY start_time DESC 
+    LIMIT 1
+
+  fetch_latest_load_cell_calibration_data: |
+    SELECT * FROM load_cell_calibration_data 
+    ORDER BY timestamp DESC 
+    LIMIT 1
+
+
+
+
+update:
+
+  update_data: |
+    UPDATE {table}
+    SET {set_clause}
+    WHERE {condition}

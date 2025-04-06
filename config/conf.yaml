@@ -1,3 +1,6 @@
+# Logger settings
+level: "VERBOSE"
+
 # RGB LED control
 led_type: common_anode            # [common_anode, common_cathode]
 brightness: 30                    # [0-100] %
@@ -9,6 +12,13 @@ timezone: UTC-3                   # Timezone offset from UTC
 # Controller settings
 collect_interval: 20   # intervalo em segundos para coleta automática
 led_white_current: 20   # corrente em mA para LED interno do AS7341
+oversampling: 3       # oversampling = Numero de batches de coleta de dados
 
 # ADC (Analog to Digital Converter) settings
 adc_gain: 1  # Ganho para o ADC (1, 2, 4, 8, 16)
+
+# Database settings
+load_mock_data: true  # Carregar dados de exemplo no banco de dados (apenas para teste)
+# db_filepath: ../database/sensor_data.db  # Caminho do banco de dados SQLite
+db_queries_filepath: ../config/db_queries.yaml  # Caminho do arquivo de consultas SQL
+db_filepath: unittest_database.db  # Caminho do banco de dados SQLite

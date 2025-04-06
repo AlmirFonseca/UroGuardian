@@ -1,10 +1,11 @@
 import sqlite3
+import subprocess
 import yaml
 import os
 import shutil
 from datetime import datetime
 from flask import Flask, jsonify
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from src.config_manager import ConfigManager
 from src.logger import Logger
@@ -16,32 +17,54 @@ class Database:
     database schema and data. It provides CRUD operations to store and retrieve variables.
 
     Attributes:
-        db_file (str): Path to the SQLite database file.
+        db_filepath (str): Path to the SQLite database file.
         queries (Dict[str, str]): Dictionary of queries loaded from the YAML configuration file.
         connection (sqlite3.Connection): Database connection object.
         cursor (sqlite3.Cursor): Cursor object for executing SQL queries.
     """
 
-    def __init__(self, config_manager: ConfigManager, db_file: str = "../sensor_data.db") -> None:
+    def __init__(self, config_manager: ConfigManager, 
+                 db_filepath: str = "../database/sensor_data.db", 
+                 db_queries_filepath = "../config/db_queries.yaml") -> None:
         """Initializes the database connection and loads queries.
 
         Args:
             config_manager (ConfigManager): The ConfigManager instance to load queries.
-            db_file (str, optional): Path to the SQLite database file. Default is "sensor_data.db".
+            db_filepath (str, optional): Path to the SQLite database file. Default is "../database/sensor_data.db".
+            db_queries_filepath (str, optional): Path to the YAML file containing queries. Default is "../config/db_queries.yaml".
 
         Raises:
             FileNotFoundError: If the queries file doesn't exist.
         """
-        self.db_file = db_file
         self.config_manager = config_manager
+        self.logger = Logger()
+        
+        self.db_filepath = self.config_manager.get("conf").get("db_filepath")
+        if not self.db_filepath:
+            self.db_filepath = db_filepath
+            
+        self.db_queries_filepath = self.config_manager.get("conf").get("db_queries_filepath")
+        if not self.db_queries_filepath:
+            self.db_queries_filepath = db_queries_filepath
+        
         self.queries = self.load_queries()
-        self.connection = sqlite3.connect(self.db_file, check_same_thread=False)
+        self.connection = sqlite3.connect(self.db_filepath, check_same_thread=False)
         self.cursor = self.connection.cursor()
 
         self.initialize_db()
         
-        self.logger = Logger()
+        # Debug: Load mock data if specified in the configuration
+        if self.config_manager.get("conf").get("load_mock_data"):
+            self.logger.println("Inserting mock data...", "DEBUG")
+            self.mock_data()
+
+        # Open SQLiteWeb interface for debugging using sqlite-web
+        self.start_sqlite_web()
+        
         self.logger.println("Database initialized successfully.", "INFO")
+        
+        self.device_id = None
+        self.urine_bag_id = None
 
     def load_queries(self) -> Dict[str, str]:
         """Load DDL and DML queries from the 'db_queries.yaml' configuration file.
@@ -52,11 +75,11 @@ class Database:
         Raises:
             FileNotFoundError: If the queries file doesn't exist.
         """
-        queries_file = "../config/db_queries.yaml"
-        if not os.path.exists(queries_file):
-            raise FileNotFoundError(f"Queries file '{queries_file}' not found.")
         
-        with open(queries_file, "r") as file:
+        if not os.path.exists(self.db_queries_filepath):
+            raise FileNotFoundError(f"Queries file '{self.db_queries_filepath}' not found.")
+        
+        with open(self.db_queries_filepath, "r") as file:
             return yaml.safe_load(file)
 
     def initialize_db(self) -> None:
@@ -68,6 +91,28 @@ class Database:
         ddl_queries = self.queries.get("ddl", {})
         for query_key, query in ddl_queries.items():
             self.execute_query(query_key, query)
+            
+    def start_sqlite_web(self) -> None:
+        """Starts the SQLiteWeb server to view and interact with the database in a browser.
+
+        This will run the `sqlite_web` tool in the background to serve the database via a web interface.
+        The server will be accessible via a browser at the specified address.
+        
+        Returns:
+            None
+        """
+        try:
+            # Run sqlite-web to open the database in a browser
+            # Use subprocess to run the command as a background process
+            subprocess.Popen(['sqlite_web', self.db_filepath])            
+            
+            # Get the networks IP address of the device
+            hostname = subprocess.check_output(['hostname', '-I']).decode().strip()
+            self.logger.println(f"SQLiteWeb is running at http://{hostname}:8080", "INFO")
+            
+        except Exception as e:
+            self.logger.println(f"Error starting SQLiteWeb: {e}", "ERROR")
+        
 
     def execute_query(self, query_key: str, query: str, params: tuple = ()) -> None:
         """Execute a query (INSERT, SELECT, etc.) on the database. 
@@ -84,7 +129,7 @@ class Database:
         self.cursor.execute(query, params)
         self.connection.commit()
 
-    def fetch_one(self, query_key: str, query: str, params: tuple = ()) -> Any:
+    def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
         """Fetch a single result from a query.
 
         Args:
@@ -94,12 +139,20 @@ class Database:
         
         Returns:
             Any: The fetched result.
+            
+        Raises:
+            ValueError: If the query key is not found.
         """
+        query = self.queries.get("fetch", {}).get(query_key) if not query else query
+        
+        if not query:
+            raise ValueError(f"Fetch query with key '{query_key}' not found.")
+        
         self.logger.println(f"Fetching one result for query: {query_key}", "DEBUG")
         self.cursor.execute(query, params)
         return self.cursor.fetchone()
 
-    def fetch_all(self, query_key: str, query: str, params: tuple = ()) -> Any:
+    def fetch_all(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
         """Fetch all results from a query.
 
         Args:
@@ -109,7 +162,15 @@ class Database:
         
         Returns:
             Any: The fetched results.
+            
+        Raises:
+            ValueError: If the query key is not found.
         """
+        query = self.queries.get("fetch", {}).get(query_key) if not query else query
+        
+        if not query:
+            raise ValueError(f"Fetch query with key '{query_key}' not found.")
+        
         self.logger.println(f"Fetching all results for query: {query_key}", "DEBUG")
         self.cursor.execute(query, params)
         return self.cursor.fetchall()
@@ -137,7 +198,7 @@ class Database:
         query = query.format(table=table, columns=columns, placeholders=placeholders)
         self.execute_query(query_key, query, tuple(data.values()))
 
-    def update_data(self, query_key: str, table: str, data: Dict[str, Any], condition: str) -> None:
+    def update_data(self, query_key: str, table: str, data: Dict[str, Any], condition: Optional[str] = "1=1") -> None:
         """Update data in the specified table based on a condition.
 
         Args:
@@ -152,13 +213,55 @@ class Database:
         Raises:
             ValueError: If the query key is not found.
         """
-        query = self.queries.get("dml", {}).get(query_key)
+        query = self.queries.get("update", {}).get(query_key)
         if not query:
             raise ValueError(f"Update query with key '{query_key}' not found.")
         
         set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
-        query = query.format(table=table, set_clause=set_clause, condition=condition)
+        query = query.format(table=table, set_clause=set_clause, condition=condition)        
         self.execute_query(query_key, query, tuple(data.values()))
+        
+    def mock_data(self) -> None:
+        """Load mock data into the database for testing purposes.
+
+        Returns:
+            None
+        """
+        mock_data_queries = self.queries.get("mock", {})
+        for query_key, query in mock_data_queries.items():
+            self.execute_query(query_key, query)
+            
+    def show_table(self, table: str) -> None:
+        """Display the contents of the specified table.
+
+        Args:
+            table (str): Table name.
+        
+        Returns:
+            None
+        """
+        query = f"SELECT * FROM {table}"
+        self.cursor.execute(query)
+        rows = self.cursor.fetchall()
+        
+        for row in rows:
+            print(row)
+            
+    def show_table_structure(self, table: str) -> None:
+        """Display the structure of the specified table.
+
+        Args:
+            table (str): Table name.
+        
+        Returns:
+            None
+        """
+        query = f"PRAGMA table_info({table})"
+        self.cursor.execute(query)
+        columns = self.cursor.fetchall()
+        
+        for column in columns:
+            print(column)
 
     def backup_database(self, backup_dir: str = "backups") -> None:
         """Create a backup of the current database with a timestamp in the filename.
@@ -178,7 +281,7 @@ class Database:
         backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
 
         # Copy the database to the backup file
-        shutil.copy(self.db_file, backup_file)
+        shutil.copy(self.db_filepath, backup_file)
         self.logger.println(f"Backup created at: {backup_file}", "INFO")
 
     def close(self) -> None:
@@ -190,73 +293,163 @@ class Database:
         self.connection.close()
         
         self.logger.println("Database connection closed.", "INFO")
-
-
-class DatabaseAPI:
-    """Flask API for remotely accessing the local database data.
-
-    This class exposes an API to remotely access data stored in the SQLite database.
-
-    Attributes:
-        app (Flask): Flask application instance.
-        db (Database): Database instance to interact with the database.
-    """
-
-    def __init__(self, db: Database) -> None:
-        """Initializes the Flask API.
-
-        Args:
-            db (Database): The database instance to interact with.
+        
+    def describe_database(self) -> Dict[str, Any]:
+        """
+        Describes the structure of the SQLite database, returning tables, columns, types, 
+        primary keys and foreign keys.
 
         Returns:
-            None
+            Dict[str, Any]: A dictionary describing the entire database schema.
         """
-        self.db = db
-        self.app = Flask(__name__)
+        self.logger.println("Describing database schema...", "INFO")
+
+        schema = {}
         
-        self.logger = Logger()
+        # Get all tables from the SQLite master
+        self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in self.cursor.fetchall()]
 
-        @self.app.route('/data/<table>', methods=['GET'])
-        def get_data(table: str):
-            """Fetch all data from the specified table.
-
-            Args:
-                table (str): Table name.
+        for table in tables:
+            self.logger.println(f"Analyzing table: {table}", "DEBUG")
             
-            Returns:
-                JSON: The data in JSON format.
-            """
-            data = self.db.fetch_all("fetch_data", f"SELECT * FROM {table}")
-            return jsonify(data)
-        
-        # Define a function to print the available tables in the database
-        @self.app.route('/tables', methods=['GET'])
-        def list_tables():
-            """List all tables in the database.
+            schema[table] = {
+                "columns": [],
+                "foreign_keys": []
+            }
 
-            Returns:
-                JSON: List of table names.
-            """
-            self.db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            tables = [row[0] for row in self.db.cursor.fetchall()]
-            return jsonify(tables)
+            # Get columns information
+            self.cursor.execute(f"PRAGMA table_info({table});")
+            columns_info = self.cursor.fetchall()
+            
+            for column in columns_info:
+                col_info = {
+                    "id": column[0],
+                    "name": column[1],
+                    "type": column[2],
+                    "notnull": bool(column[3]),
+                    "default": column[4],
+                    "primary_key": bool(column[5])
+                }
+                schema[table]["columns"].append(col_info)
 
-    def run(self, host: str = "0.0.0.0", port: int = 5000) -> None:
-        """Run the Flask API server.
+            # Get foreign keys information
+            self.cursor.execute(f"PRAGMA foreign_key_list({table});")
+            foreign_keys_info = self.cursor.fetchall()
+            
+            for fk in foreign_keys_info:
+                fk_info = {
+                    "id": fk[0],
+                    "seq": fk[1],
+                    "table": fk[2],
+                    "from": fk[3],
+                    "to": fk[4],
+                    "on_update": fk[5],
+                    "on_delete": fk[6],
+                    "match": fk[7]
+                }
+                schema[table]["foreign_keys"].append(fk_info)
+
+        self.logger.println("Database schema description completed.", "INFO")
+
+        return schema
+    
+    def get_new_id(self, table: str) -> int:
+        """Get the next available ID for a new entry in the specified table.
 
         Args:
-            host (str, optional): Host to bind the server to (default is '0.0.0.0').
-            port (int, optional): Port to bind the server to (default is 5000).
+            table (str): The name of the table.
         
         Returns:
-            None
+            int: The next available ID.
+            
+        Raises:
+            ValueError: If the table does not exist or if the ID cannot be retrieved.
         """
-        self.app.run(host=host, port=port)
+        
+        query = f"SELECT MAX(id) FROM {table}"
+        max_id = self.fetch_one("get_new_id", query)
+        
+        if max_id is None:
+            return 1
+        else:
+            return max_id[0] + 1
+        
+    def get_last_inserted_id(self, table: str) -> int:
+        """Get the last inserted ID from the specified table.
 
-
-# Example Usage:
-# if __name__ == "__main__":
-#     config_manager = ConfigManager()
-#     db = Database(config_manager)
-#     api = DatabaseAPI(db)
-#     api.run(host="0.0.0.0", port=5000)
+        Args:
+            table (str): The name of the table.
+        
+        Returns:
+            int: The last inserted ID.
+            
+        Raises:
+            ValueError: If the table does not exist or if the ID cannot be retrieved.
+        """
+        
+        query = f"SELECT last_insert_rowid() FROM {table}"
+        last_id = self.fetch_one("get_last_inserted_id", query)
+        
+        if last_id is None:
+            return 0
+        else:
+            return last_id[0]
+    
+    def get_device_id(self) -> Optional[str]:
+        """Get the device ID from the system according to the mac_address
+        
+        Args:
+            None
+        
+        Returns:
+            str: The device ID.
+        
+        Raises:
+            ValueError: If the device ID is not found or if the device ID is not set.
+        """
+        
+        if self.device_id:
+            return self.device_id
+        
+        try:
+            # Get the MAC address of the device
+            mac_address = subprocess.check_output(['cat', '/sys/class/net/eth0/address']).decode().strip()
+            
+            # Get the device ID from the device table where mac_address matches
+            query = "SELECT device_id FROM devices WHERE mac_address = ?"
+            
+            self.device_id = self.fetch_one("get_device_id", query, (mac_address,))
+            
+            return self.device_id
+        except Exception as e:
+            self.logger.println(f"Error getting device ID: {e}", "ERROR")
+            return None
+        
+    def get_urine_bag_id(self, force_update: bool = False) -> Optional[str]:
+        """Get the urine bag ID from the urine_bag table according to the device ID and where 'status' is 'active'
+        
+        Args:
+            force_update (bool): If True, forces an update of the urine bag ID.
+            
+        Returns:
+            str: The urine bag ID.
+            
+        Raises:
+            ValueError: If the urine bag ID is not found or if the device ID is not set.
+        """
+        
+        if self.urine_bag_id and not force_update:
+            return self.urine_bag_id
+        
+        try:
+            # Get the urine bag ID from the urine_bag table where device_id matches and status is active
+            query = "SELECT urine_bag_id FROM urine_bag WHERE device_id = ? AND status = 'active'"
+            
+            self.urine_bag_id = self.fetch_one("get_urine_bag_id", query, (self.device_id,))
+            
+            return self.urine_bag_id
+        except Exception as e:
+            self.logger.println(f"Error getting urine bag ID: {e}", "ERROR")
+            return None
+        
