@@ -159,7 +159,7 @@ class LoadCell:
         Returns:
             None
         """
-        result = self.db.fetch_one("fetch_latest_calibration", "SELECT * FROM calibration_data ORDER BY timestamp DESC LIMIT 1")
+        result = self.db.fetch_one("fetch_latest_load_cell_calibration_data", "SELECT * FROM calibration_data ORDER BY timestamp DESC LIMIT 1")
         
         if result:
             self.calibration_factor = result[2]  # Assuming calibration_factor is the 3rd column
