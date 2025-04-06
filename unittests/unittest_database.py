@@ -39,21 +39,24 @@ class TestDatabase(unittest.TestCase):
 
     def test_insert_device(self):
         """Testa a inserção de dados na tabela device."""
-        device_data = ("UroGuardian MVP", "0.0.1", "192.168.0.168", "active", "2025-03-30 08:00:00")
+        device_data = ('00:B0:D0:63:C2:26', "UroGuardian MVP", "0.0.1", "192.168.0.168", "active", "2025-03-30 08:00:00")
         self.db.insert_data("insert_device", "device", {
-            "name": device_data[0],
-            "version": device_data[1],
-            "ip_address": device_data[2],
-            "status": device_data[3],
-            "last_update": device_data[4]
+            "mac_address": device_data[0],
+            "name": device_data[1],
+            "version": device_data[2],
+            "ip_address": device_data[3],
+            "status": device_data[4],
+            "last_update": device_data[5]
         })
         
         # Verifica se a inserção foi bem-sucedida
         result = self.db.fetch_one("fetch_device")
-        self.assertEqual(result[1], "UroGuardian MVP")
-        self.assertEqual(result[2], "0.0.1")
-        self.assertEqual(result[3], "192.168.0.168")
-        self.assertEqual(result[4], "active")
+        self.assertEqual(result[1], "00:B0:D0:63:C2:26")
+        self.assertEqual(result[2], "UroGuardian MVP")
+        self.assertEqual(result[3], "0.0.1")
+        self.assertEqual(result[4], "192.168.0.168")
+        self.assertEqual(result[5], "active")
+        
 
     def test_insert_patient(self):
         """Testa a inserção de dados na tabela patient."""
@@ -82,43 +85,45 @@ class TestDatabase(unittest.TestCase):
 
     def test_update_device(self):
         """Testa a atualização de dados na tabela device."""
-        device_data = ("UroGuardian MVP", "0.0.1", "192.168.0.168", "inactive", "2025-03-30 09:00:00")
+        device_data = ('00:B0:D0:63:C2:26', "UroGuardian MVP", "0.0.1", "192.168.0.168", "inactive", "2025-03-30 09:00:00")
         self.db.insert_data("insert_device", "device", {
-            "name": device_data[0],
-            "version": device_data[1],
-            "ip_address": device_data[2],
-            "status": device_data[3],
-            "last_update": device_data[4]
+            "mac_address": device_data[0],
+            "name": device_data[1],
+            "version": device_data[2],
+            "ip_address": device_data[3],
+            "status": device_data[4],
+            "last_update": device_data[5]
         })
         
         # Atualiza o status do dispositivo
         self.db.update_data("update_data", "device", {
-            "name": "UroGuardian MVP",
-            "version": "0.0.1",
-            "ip_address": "192.168.0.168",
+            "mac_address": device_data[0],
+            "name": device_data[1],
+            "version": device_data[2],
+            "ip_address": device_data[3],
             "status": "active",
-            "last_update": "2025-03-30 10:00:00"
+            "last_update": device_data[5]
         })
         
         # Verifica se a atualização foi bem-sucedida
         result = self.db.fetch_one("fetch_device", "SELECT * FROM device ORDER BY id DESC LIMIT 1")
-        self.assertEqual(result[4], "active")
+        self.assertEqual(result[5], "active")
 
     def test_fetch_all_devices(self):
         """Testa a recuperação de todos os dispositivos."""
         self.db.insert_data("insert_device", "device", {
-            "name": "Device 1", "version": "1.0", "ip_address": "192.168.0.101", "status": "active", "last_update": "2025-03-30 08:00:00"
+            "mac_address": '00:B0:D0:63:C2:26', "name": "Device 1", "version": "1.0", "ip_address": "192.168.0.101", "status": "active", "last_update": "2025-03-30 08:00:00"
         })
         self.db.insert_data("insert_device", "device", {
-            "name": "Device 2", "version": "1.2", "ip_address": "192.168.0.102", "status": "inactive", "last_update": "2025-03-30 08:10:00"
+            "mac_address": '00:B0:D0:63:C2:27', "name": "Device 2", "version": "1.2", "ip_address": "192.168.0.102", "status": "inactive", "last_update": "2025-03-30 08:10:00"
         })
         
         # Recupera todos os dispositivos
         result = self.db.fetch_all("fetch_devices", "SELECT * FROM device")
         
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0][1], "Device 1")
-        self.assertEqual(result[1][1], "Device 2")
+        self.assertEqual(result[0][2], "Device 1")
+        self.assertEqual(result[1][2], "Device 2")
 
     def test_backup_database(self):
         """Testa o backup do banco de dados."""

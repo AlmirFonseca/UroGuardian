@@ -151,7 +151,7 @@ ddl:
       channel_630nm INTEGER,                    -- Leitura do canal de 630nm
       channel_680nm INTEGER,                    -- Leitura do canal de 680nm
       channel_clear INTEGER,                    -- Leitura do canal clear
-      channel_nir INTEGER                       -- Leitura do canal near-infrared (NIR)
+      channel_nir INTEGER,                       -- Leitura do canal near-infrared (NIR)
       FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
     )
 
@@ -164,7 +164,7 @@ ddl:
       batch INTEGER,                         -- ID do lote de amostras (1, 2, 3, ...)
       weight REAL,                           -- Peso medido pela célula de carga
       tare_offset REAL,                      -- Offset de tara utilizado na leitura
-      calibration_factor REAL                -- Fator de calibração utilizado
+      calibration_factor REAL,                -- Fator de calibração utilizado
       FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
     )
 
