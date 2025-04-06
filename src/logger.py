@@ -41,10 +41,10 @@ class Logger:
 
     COLORS = {
         0: Fore.CYAN,      # VERBOSE
-        1: Fore.GREEN,     # DEBUG
-        2: Fore.WHITE,     # INFO
-        3: Fore.YELLOW,    # LOG
-        4: Fore.MAGENTA,   # WARNING
+        1: Fore.WHITE,     # DEBUG
+        2: Fore.GREEN,     # INFO
+        3: Fore.MAGENTA,    # LOG
+        4: Fore.YELLOW,   # WARNING
         5: Fore.RED,       # ERROR
         6: Fore.RED,       # EXCEPTION
         7: Fore.RED,       # FATAL
@@ -58,7 +58,7 @@ class Logger:
             config_path (str): Caminho para o arquivo YAML com as configurações de logging.
         """
         config_manager = ConfigManager()
-        logging_config = config_manager.get("logging")
+        logging_config = config_manager.get("conf")
         level_str = logging_config.get("level", "INFO")
         self.level = self.LEVELS.get(level_str.upper(), 2)
         self.show_tag = True
