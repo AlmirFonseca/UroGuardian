@@ -23,6 +23,6 @@ adc_gain: 1  # Ganho para o ADC (1, 2, 4, 8, 16)
 
 # Database settings
 load_mock_data: true  # Carregar dados de exemplo no banco de dados (apenas para teste)
-# db_filepath: ../database/sensor_data.db  # Caminho do banco de dados SQLite
+db_filepath: ../database/sensor_data.db  # Caminho do banco de dados SQLite
 db_queries_filepath: ../config/db_queries.yaml  # Caminho do arquivo de consultas SQL
-db_filepath: unittest_database.db  # Caminho do banco de dados SQLite
+# db_filepath: unittest_database.db  # Caminho do banco de dados SQLite

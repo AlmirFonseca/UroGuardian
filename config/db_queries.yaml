@@ -279,7 +279,7 @@ mock:
   # ----------------------------------------
   populate_mock_device: |
     INSERT INTO device (mac_address, name, version, ip_address, status, last_update)
-    SELECT  '00:B0:D0:63:C2:26', 'UroGuardian MVP', '0.0.1', '192.168.0.168', 'active', '2025-03-30 08:00:00'
+    SELECT  'd8:3a:dd:39:2c:de', 'UroGuardian MVP', '0.0.1', '192.168.0.168', 'active', '2025-03-30 08:00:00'
     WHERE NOT EXISTS (SELECT 1 FROM device)
 
   # ----------------------------------------
@@ -309,6 +309,12 @@ mock:
     INSERT INTO urine_bag (device_id, patient_id, urine_bag_type_id, status, start_time, end_time)
     SELECT 1, 1, 1, 'active', '2025-03-30 08:00:00', ''
     WHERE NOT EXISTS (SELECT 1 FROM urine_bag)
+
+
+  populate_mock_calibration_data: |
+    INSERT INTO load_cell_calibration_data (timestamp, calibration_factor, tare_offset)
+    SELECT '2025-03-30 08:00:00', 1.11, 11.1
+    WHERE NOT EXISTS (SELECT 1 FROM load_cell_calibration_data)
 
 
 

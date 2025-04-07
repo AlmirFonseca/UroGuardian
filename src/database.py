@@ -1,5 +1,6 @@
 import sqlite3
 import subprocess
+import re
 import yaml
 import os
 import shutil
@@ -46,6 +47,10 @@ class Database:
         self.db_queries_filepath = self.config_manager.get("conf").get("db_queries_filepath")
         if not self.db_queries_filepath:
             self.db_queries_filepath = db_queries_filepath
+            
+        # If the folder does not exist, create it
+        if not os.path.exists(os.path.dirname(self.db_filepath)):
+            os.makedirs(os.path.dirname(self.db_filepath))
         
         self.queries = self.load_queries()
         self.connection = sqlite3.connect(self.db_filepath, check_same_thread=False)
@@ -395,6 +400,32 @@ class Database:
             return 0
         else:
             return last_id[0]
+        
+    def get_mac_address(self) -> Optional[str]:
+        """Fetch the MAC address of the Raspberry Pi from the network interface.
+        
+        Args:
+            None
+        
+        Returns:
+            str: The MAC address (if found), or None if not found.
+            
+        Raises:
+            ValueError: If the MAC address cannot be retrieved.
+        """
+        try:
+            # Run the ifconfig command and capture the output
+            result = subprocess.run(['ifconfig', 'wlan0'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode('utf-8')
+            
+            # Use regex to find the MAC address (ether xx:xx:xx:xx:xx:xx)
+            match = re.search(r'ether ([0-9a-fA-F:]{17})', output)
+            if match:
+                return match.group(1)  # Return the MAC address found
+            return None
+        except Exception as e:
+            raise ValueError(f"Error while retrieving MAC address: {str(e)}")
+
     
     def get_device_id(self) -> Optional[str]:
         """Get the device ID from the system according to the mac_address
@@ -414,7 +445,9 @@ class Database:
         
         try:
             # Get the MAC address of the device
-            mac_address = subprocess.check_output(['cat', '/sys/class/net/eth0/address']).decode().strip()
+            mac_address = self.get_mac_address()
+            
+            self.logger.println(f"MAC Address: {mac_address}", "DEBUG")
             
             # Get the device ID from the device table where mac_address matches
             query = "SELECT device_id FROM devices WHERE mac_address = ?"
