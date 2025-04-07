@@ -49,6 +49,7 @@ class Controller:
         self.oversampling = self.config.get("conf")["oversampling"]
 
         self.is_paused = False
+        self.lock = threading.Lock()
         
         # Inicializar API Flask para consulta remota
         # self.api = DatabaseAPI(self.db)
@@ -212,7 +213,7 @@ class Controller:
             batch_number (int): The batch number.
         """
         self.collect_spectrum_data(sample_id, batch_number)
-        # self.collect_load_cell_data(sample_id, batch_number)
+        self.collect_load_cell_data(sample_id, batch_number)
 
     def collect_routine(self):
         """
@@ -225,35 +226,42 @@ class Controller:
         5. Updates the 'samples' table entry with the end timestamp.
         6. Logs the completion of the data collection process.
         """
-        
-        self.logger.println(f"Starting complete collection routine ({self.oversampling} batches)", "INFO")
-        
-        start_collection_time = datetime.now()
-        
-        # Insert entry on 'samples' table and get sample ID
-        self.db.insert_data("insert_samples", "samples", {
-            "urine_bag_id": self.urine_bag_id,
-            "start_timestamp": datetime.now().isoformat(),
-            "end_timestamp": None,
-        })
-        sample_id = self.db.get_last_inserted_id("samples")
+        # Check if another collection routine is already running
+        if self.lock.locked():
+            self.logger.println("Collection routine is already running. Skipping this execution.", "INFO")
+            return
 
-        for batch_number in range(self.oversampling):
-            self.logger.print_separator("DEBUG", sep_type=".")
-            self.logger.println(f"Starting batch {batch_number + 1}/{self.oversampling}", "INFO")
+        # Acquire the lock to prevent other threads from entering the routine
+        with self.lock:
             
-            self.collect_batch(sample_id, batch_number + 1)
+            self.logger.println(f"Starting complete collection routine ({self.oversampling} batches)", "INFO")
+            
+            start_collection_time = datetime.now()
+            
+            # Insert entry on 'samples' table and get sample ID
+            self.db.insert_data("insert_samples", "samples", {
+                "urine_bag_id": self.urine_bag_id,
+                "start_timestamp": datetime.now().isoformat(),
+                "end_timestamp": None,
+            })
+            sample_id = self.db.get_last_inserted_id("samples")
 
-        end_collection_time = datetime.now()
-        duration = (end_collection_time - start_collection_time).total_seconds()
-        self.logger.println(f"Collection completed in {duration:.2f} seconds", "INFO")
+            for batch_number in range(self.oversampling):
+                self.logger.print_separator("DEBUG", sep_type=".")
+                self.logger.println(f"Starting batch {batch_number + 1}/{self.oversampling}", "INFO")
+                
+                self.collect_batch(sample_id, batch_number + 1)
 
-        # Update the sample entry with end timestamp
-        self.db.update_data("update_sample", "samples", {"end_timestamp": end_collection_time.isoformat()}, condition=f"id = {sample_id}")
-        self.logger.println(f"Sample entry updated with end timestamp: {end_collection_time.isoformat()}", "INFO")
+            end_collection_time = datetime.now()
+            duration = (end_collection_time - start_collection_time).total_seconds()
+            self.logger.println(f"Collection completed in {duration:.2f} seconds", "INFO")
 
-        self.logger.println("Collection data completed", "INFO")
-        self.logger.print_separator("DEBUG")
+            # Update the sample entry with end timestamp
+            self.db.update_data("update_data", "samples", {"end_timestamp": end_collection_time.isoformat()}, condition=f"sample_id = {sample_id}")
+            self.logger.println(f"Sample entry updated with end timestamp: {end_collection_time.isoformat()}", "INFO")
+
+            self.logger.println("Collection data completed", "INFO")
+            self.logger.print_separator("DEBUG")
 
     def schedule_collection(self):
         self.logger.println(f"Scheduling data collection every {self.collect_interval} seconds.", "INFO")

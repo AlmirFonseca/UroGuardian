@@ -118,7 +118,9 @@ class LoadCell:
             float: The current weight in calibrated units (e.g., grams).
         """
         raw_data = self.get_raw_data()
-        weight = raw_data * self.calibration_factor
+        raw_data_mean = float(sum(raw_data)) / float(len(raw_data))  # Average of the raw data readings
+        
+        weight = raw_data_mean * self.calibration_factor
         weight -= self.tare_offset  # Apply tare offset
         
         self.logger.println(f"Raw data: {raw_data}, Weight: {weight} grams", "DEBUG")

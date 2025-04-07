@@ -124,7 +124,7 @@ class RGBLED(LED):
         self.invert_logic = self.led_type == "common_anode"
         
         # Inicializa os LEDs desligados
-        self.set_color(0, 0, 0)
+        self.set_color(0)
 
     def _adjust_brightness(self, pwm_instance, brightness: int) -> None:
         """Ajusta o brilho de um LED individual usando PWM.
@@ -138,12 +138,8 @@ class RGBLED(LED):
         """
         if self.invert_logic:
             brightness = 100 - brightness  # Inverte a lógica para anodo comum
-
-        pwm_duty = brightness  # PWM duty cycle is the same as brightness (0-100%)
-
-        # Use the ChangeDutyCycle method to set the PWM duty cycle
-        pwm_instance.ChangeDutyCycle(pwm_duty)
-
+            
+        pwm_instance.set_brightness(brightness)
 
     def set_color(self, color: Optional[str] = 0, ) -> None:
         """Define a cor do LED RGB com base na letra fornecida (R, G ou B).

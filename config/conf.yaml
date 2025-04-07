@@ -15,7 +15,7 @@ timezone: UTC-3                   # Timezone offset from UTC
 
 # Controller settings
 collect_interval: 20   # intervalo em segundos para coleta automática
-led_white_current: 20   # corrente em mA para LED interno do AS7341
+led_white_current: 5   # corrente em mA para LED interno do AS7341
 oversampling: 3       # oversampling = Numero de batches de coleta de dados
 
 # ADC (Analog to Digital Converter) settings

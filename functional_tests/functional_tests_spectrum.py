@@ -1,17 +1,18 @@
 import sys
 import os
 
-# Adiciona a pasta pai ao sys.path
+# Add the parent folder to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-
+from src.config_manager import ConfigManager
 from src.spectrum import SpectrumSensor
 import board
 import time
 
 def spectrum_demo():
-    # Cria a instância do SpectrumSensor
-    spectrum = SpectrumSensor(i2c_bus=board.I2C())
+    # Create an instance of the SpectrumSensor
+    config_manager = ConfigManager()
+    spectrum = SpectrumSensor(conf=config_manager, i2c_bus=board.I2C())
     
     # Display readings for specific channels
     print("Reading 415nm and 555nm channels...")

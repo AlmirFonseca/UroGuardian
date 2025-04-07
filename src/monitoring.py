@@ -175,7 +175,7 @@ class SystemMonitoring:
         
         # Insert data into the 'system_monitoring' table using query key
         try:
-            self.db.insert_data("insert_data_system_monitoring", "system_monitoring", data)
+            self.db.insert_data("insert_system_monitoring", "system_monitoring", data)
             self.logger.println(f"Data collected and stored at {timestamp}", "INFO")
         except ValueError as e:
             self.logger.println(f"Error inserting data: {e}", "ERROR")

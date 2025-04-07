@@ -63,15 +63,15 @@ class TestSystemMonitoring(unittest.TestCase):
             data = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "cpu_usage": 25.5,
+                "cpu_temp": 80.2,
                 "ram_usage": 45.0,
-                "power_usage": None,
                 "disk_usage": 60.0,
                 "network_usage": 3.0,
                 "wifi_ssid": "MyWiFi",
                 "wifi_signal_strength": -70
             }
             self.monitoring.collect_and_store_data()
-            mock_insert_data.assert_called_once_with("insert_data_system_monitoring", "system_monitoring", data)
+            mock_insert_data.assert_called_once_with("insert_system_monitoring", "system_monitoring", data)
 
     @patch('psutil.cpu_percent', return_value=25.5)
     @patch('psutil.virtual_memory', return_value=MagicMock(percent=45.0))
