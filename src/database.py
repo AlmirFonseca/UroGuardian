@@ -7,7 +7,6 @@ import shutil
 from datetime import datetime
 from flask import Flask, jsonify
 from typing import Any, Dict, Optional
-import threading
 
 from src.config_manager import ConfigManager
 from src.logger import Logger
@@ -37,9 +36,7 @@ class Database:
 
         Raises:
             FileNotFoundError: If the queries file doesn't exist.
-        """
-        self.lock = threading.Lock()
-        
+        """        
         self.config_manager = config_manager
         self.logger = Logger()
         
@@ -138,18 +135,16 @@ class Database:
             None
         """
         self.logger.println(f"Executing query: {query_key}", "DEBUG")
-    
-        with self.lock:
-            with self.connection:
-                try:
-                    self.cursor.execute(query, params)
-                except sqlite3.Error as e:
-                    self.logger.println(f"Error executing query: {e}", "ERROR")
-                    # Optionally, you can raise the error or handle it as needed
-                    # raise e
-            
-            # self.cursor.execute(query, params)
-            # self.connection.commit()
+        
+        with self.connection:
+            cursor = self.connection.cursor()
+            try:
+                cursor.execute(query, params)
+                self.connection.commit()
+            except sqlite3.Error as e:
+                self.logger.println(f"Error executing query: {e}", "ERROR")
+                # Optionally, you can raise the error or handle it as needed
+                # raise e
 
     def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
         """Fetch a single result from a query.
@@ -171,8 +166,11 @@ class Database:
             raise ValueError(f"Fetch query with key '{query_key}' not found.")
         
         self.logger.println(f"Fetching one result for query: {query_key}", "DEBUG")
-        self.cursor.execute(query, params)
-        return self.cursor.fetchone()
+        
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        
+        return cursor.fetchone()
 
     def fetch_all(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
         """Fetch all results from a query.
@@ -194,8 +192,11 @@ class Database:
             raise ValueError(f"Fetch query with key '{query_key}' not found.")
         
         self.logger.println(f"Fetching all results for query: {query_key}", "DEBUG")
-        self.cursor.execute(query, params)
-        return self.cursor.fetchall()
+        
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        
+        return cursor.fetchall()
 
     def insert_data(self, query_key: str, table: str, data: Dict[str, Any]) -> None:
         """Insert data into the specified table.
@@ -262,9 +263,11 @@ class Database:
         Returns:
             None
         """
+        
+        self.logger.println(f"Contents of table '{table}':", "INFO")
+        
         query = f"SELECT * FROM {table}"
-        self.cursor.execute(query)
-        rows = self.cursor.fetchall()
+        rows = self.fetch_all("show_table", query)
         
         for row in rows:
             print(row)
@@ -277,10 +280,11 @@ class Database:
         
         Returns:
             None
-        """
+        """        
+        self.logger.println(f"Structure of table '{table}':", "INFO")
+        
         query = f"PRAGMA table_info({table})"
-        self.cursor.execute(query)
-        columns = self.cursor.fetchall()
+        columns = self.fetch_all("show_table_structure", query)
         
         for column in columns:
             print(column)
@@ -329,8 +333,9 @@ class Database:
         schema = {}
         
         # Get all tables from the SQLite master
-        self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [row[0] for row in self.cursor.fetchall()]
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
 
         for table in tables:
             self.logger.println(f"Analyzing table: {table}", "DEBUG")
@@ -341,8 +346,8 @@ class Database:
             }
 
             # Get columns information
-            self.cursor.execute(f"PRAGMA table_info({table});")
-            columns_info = self.cursor.fetchall()
+            cursor.execute(f"PRAGMA table_info({table});")
+            columns_info = cursor.fetchall()
             
             for column in columns_info:
                 col_info = {
@@ -356,8 +361,8 @@ class Database:
                 schema[table]["columns"].append(col_info)
 
             # Get foreign keys information
-            self.cursor.execute(f"PRAGMA foreign_key_list({table});")
-            foreign_keys_info = self.cursor.fetchall()
+            cursor.execute(f"PRAGMA foreign_key_list({table});")
+            foreign_keys_info = cursor.fetchall()
             
             for fk in foreign_keys_info:
                 fk_info = {
