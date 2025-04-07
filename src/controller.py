@@ -231,7 +231,7 @@ class Controller:
         start_collection_time = datetime.now()
         
         # Insert entry on 'samples' table and get sample ID
-        self.db.insert_data("insert_sample", "samples", {
+        self.db.insert_data("insert_samples", "samples", {
             "urine_bag_id": self.urine_bag_id,
             "start_timestamp": datetime.now().isoformat(),
             "end_timestamp": None,
@@ -293,7 +293,7 @@ class Controller:
             return False
         
         # Get related urine bag ID from the database
-        self.urine_bag_id = self.db.get_urine_bag_id(self.device_id, force_update)
+        self.urine_bag_id = self.db.get_urine_bag_id(force_update)
         if not self.urine_bag_id:
             self.logger.println("No urine bag ID found. Please register the urine bag first.", "ERROR")
             return False

@@ -7,6 +7,7 @@ import shutil
 from datetime import datetime
 from flask import Flask, jsonify
 from typing import Any, Dict, Optional
+import threading
 
 from src.config_manager import ConfigManager
 from src.logger import Logger
@@ -37,6 +38,8 @@ class Database:
         Raises:
             FileNotFoundError: If the queries file doesn't exist.
         """
+        self.lock = threading.Lock()
+        
         self.config_manager = config_manager
         self.logger = Logger()
         
@@ -107,9 +110,13 @@ class Database:
             None
         """
         try:
+            # If there is any 'sqlite_web' process running, kill it
+            subprocess.run(['pkill', '-f', 'sqlite_web'])
+            
             # Run sqlite-web to open the database in a browser
             # Use subprocess to run the command as a background process
-            subprocess.Popen(['sqlite_web', self.db_filepath])            
+            # --host=0.0.0.0 --port=5050          
+            subprocess.Popen(['sqlite_web', '--host=0.0.0.0', '--port=5050', self.db_filepath]) 
             
             # Get the networks IP address of the device
             hostname = subprocess.check_output(['hostname', '-I']).decode().strip().split()[0]
@@ -131,8 +138,18 @@ class Database:
             None
         """
         self.logger.println(f"Executing query: {query_key}", "DEBUG")
-        self.cursor.execute(query, params)
-        self.connection.commit()
+    
+        with self.lock:
+            with self.connection:
+                try:
+                    self.cursor.execute(query, params)
+                except sqlite3.Error as e:
+                    self.logger.println(f"Error executing query: {e}", "ERROR")
+                    # Optionally, you can raise the error or handle it as needed
+                    # raise e
+            
+            # self.cursor.execute(query, params)
+            # self.connection.commit()
 
     def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
         """Fetch a single result from a query.
@@ -449,10 +466,10 @@ class Database:
             
             self.logger.println(f"MAC Address: {mac_address}", "DEBUG")
             
-            # Get the device ID from the device table where mac_address matches
-            query = "SELECT device_id FROM devices WHERE mac_address = ?"
+            # Get the device ID from the device table where mac_address matches            
+            self.device_id = self.fetch_one("fetch_device_id", params=(mac_address,))[0]
             
-            self.device_id = self.fetch_one("get_device_id", query, (mac_address,))
+            self.logger.println(f"Retrieved Device ID: {self.device_id} ({type(self.device_id)})", "DEBUG")
             
             return self.device_id
         except Exception as e:
@@ -477,9 +494,11 @@ class Database:
         
         try:
             # Get the urine bag ID from the urine_bag table where device_id matches and status is active
-            query = "SELECT urine_bag_id FROM urine_bag WHERE device_id = ? AND status = 'active'"
+            query = "SELECT id FROM urine_bag WHERE device_id = ? AND status = 'active'"
             
-            self.urine_bag_id = self.fetch_one("get_urine_bag_id", query, (self.device_id,))
+            self.urine_bag_id = self.fetch_one("get_urine_bag_id", query, (self.device_id,))[0]
+            
+            self.logger.println(f"Retrieved Urine Bag ID: {self.urine_bag_id} ({type(self.urine_bag_id)})", "DEBUG")
             
             return self.urine_bag_id
         except Exception as e:

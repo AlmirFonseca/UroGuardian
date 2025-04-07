@@ -137,7 +137,7 @@ ddl:
   create_table_spectrum_data: |
     CREATE TABLE IF NOT EXISTS spectrum_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,     -- Identificador único
-      sample_id INTEGER,                        -- ID da amostra de dados (relacionamento com a tabela sample_data)
+      sample_id INTEGER,                        -- ID da amostra de dados (relacionamento com a tabela samples)
       timestamp TEXT,                           -- Data e hora da leitura
       batch INTEGER,                            -- ID do lote de amostras (1, 2, 3, ...)
       led_color TEXT,                           -- Cor do LED utilizado na medição (ex: "R" (red), "G" (green), "B" (blue), "W" (white), "IR" (infrared), "UV" (ultraviolet))
@@ -152,20 +152,20 @@ ddl:
       channel_680nm INTEGER,                    -- Leitura do canal de 680nm
       channel_clear INTEGER,                    -- Leitura do canal clear
       channel_nir INTEGER,                       -- Leitura do canal near-infrared (NIR)
-      FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
+      FOREIGN KEY (sample_id) REFERENCES samples(sample_id)  -- Relacionamento com a tabela de amostras de dados
     )
 
   # Tabela para armazenar os dados das leituras da célula de carga (peso)
   create_table_load_cell_data: |
     CREATE TABLE IF NOT EXISTS load_cell_data (
       id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Identificador único
-      sample_id INTEGER,                     -- ID da amostra de dados (relacionamento com a tabela sample_data)
+      sample_id INTEGER,                     -- ID da amostra de dados (relacionamento com a tabela samples)
       timestamp TEXT,                        -- Data e hora da leitura
       batch INTEGER,                         -- ID do lote de amostras (1, 2, 3, ...)
       weight REAL,                           -- Peso medido pela célula de carga
       tare_offset REAL,                      -- Offset de tara utilizado na leitura
       calibration_factor REAL,                -- Fator de calibração utilizado
-      FOREIGN KEY (sample_id) REFERENCES sample_data(sample_data_id)  -- Relacionamento com a tabela de amostras de dados
+      FOREIGN KEY (sample_id) REFERENCES samples(sample_id)  -- Relacionamento com a tabela de amostras de dados
     )
 
   # ----------------------------------------
@@ -327,10 +327,10 @@ fetch:
   #   ORDER BY {order_by} 
   #   LIMIT {limit}
 
-  fetch_device: |
-    SELECT * FROM device 
-    WHERE status = 'active'
-    ORDER BY last_update DESC 
+  fetch_device_id: |
+    SELECT id 
+    FROM device 
+    WHERE mac_address = ?
     LIMIT 1
 
   fetch_current_urine_bag: |
@@ -344,7 +344,6 @@ fetch:
     SELECT * FROM load_cell_calibration_data 
     ORDER BY timestamp DESC 
     LIMIT 1
-
 
 
 
