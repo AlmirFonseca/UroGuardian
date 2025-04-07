@@ -1,6 +1,6 @@
 import RPi.GPIO as GPIO
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from src.config_manager import ConfigManager
 
 
@@ -139,10 +139,13 @@ class RGBLED(LED):
         if self.invert_logic:
             brightness = 100 - brightness  # Inverte a lógica para anodo comum
 
-        pwm_duty = (brightness / 100) * 100  # Duty cycle de 0% a 100%
-        pwm_instance.set_brightness(brightness)
+        pwm_duty = brightness  # PWM duty cycle is the same as brightness (0-100%)
 
-    def set_color(self, color: str) -> None:
+        # Use the ChangeDutyCycle method to set the PWM duty cycle
+        pwm_instance.ChangeDutyCycle(pwm_duty)
+
+
+    def set_color(self, color: Optional[str] = 0, ) -> None:
         """Define a cor do LED RGB com base na letra fornecida (R, G ou B).
 
         Args:
@@ -150,24 +153,15 @@ class RGBLED(LED):
 
         Returns:
             None
-            
-        Raises:
-            ValueError: Se a cor fornecida não for válida.
         """
-        if color == "R":
-            self._adjust_brightness(self.red_led, self.brightness)
-            self._adjust_brightness(self.green_led, 0)
-            self._adjust_brightness(self.blue_led, 0)
-        elif color == "G":
-            self._adjust_brightness(self.red_led, 0)
-            self._adjust_brightness(self.green_led, self.brightness)
-            self._adjust_brightness(self.blue_led, 0)
-        elif color == "B":
-            self._adjust_brightness(self.red_led, 0)
-            self._adjust_brightness(self.green_led, 0)
-            self._adjust_brightness(self.blue_led, self.brightness)
-        else:
-            raise ValueError("Cor inválida. Use 'R', 'G' ou 'B'.")
+        
+        red_led_brightness = self.brightness if color == "R" else 0
+        green_led_brightness = self.brightness if color == "G" else 0
+        blue_led_brightness = self.brightness if color == "B" else 0
+        
+        self._adjust_brightness(self.red_led, red_led_brightness)
+        self._adjust_brightness(self.green_led, green_led_brightness)
+        self._adjust_brightness(self.blue_led, blue_led_brightness)
 
     def turn_off(self) -> None:
         """Desliga completamente o LED RGB, colocando o brilho de todas as cores em 0%.
@@ -178,7 +172,7 @@ class RGBLED(LED):
         Returns:
             None
         """
-        self.set_color(0, 0, 0)
+        self.set_color(0)
 
 
 class IRLED(LED):
