@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from src.config_manager import ConfigManager
 from src.logger import Logger
-from src.database import Database, DatabaseAPI
+from src.database import Database
 from src.rtc import RTC
 from src.led import RGBLED, IRLED
 from src.spectrum import SpectrumSensor
@@ -17,15 +17,17 @@ from src.load_cell import LoadCell
 class Controller:
     def __init__(self):
         
-        # Initializing config, logger and system monitoring components
+        # Initializing config and logger
         self.config = ConfigManager()
         self.logger = Logger()
-        self.monitor = SystemMonitoring(self.db)
         
         self.logger.println("Initializing Controller...", "INFO")
         
         # Initializing database
         self.db = Database(self.config)
+        
+        # Initializing system monitoring
+        self.monitor = SystemMonitoring(self.db)
         
         # Initializing RTC
         self.rtc = RTC(self.config)

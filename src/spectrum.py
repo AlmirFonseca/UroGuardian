@@ -32,7 +32,7 @@ class SpectrumSensor:
         if i2c_bus is None:
             i2c_bus = board.I2C()
             
-        self.i2c_address = self.conf.get("adresses").get("AS7341", 0x39)  # Default I2C address for AS7341
+        self.i2c_address = self.conf.get("addresses").get("AS7341", 0x39)  # Default I2C address for AS7341
         
         self.sensor = AS7341(i2c_bus, self.i2c_address)
         self.initialize_sensor()

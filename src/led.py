@@ -111,16 +111,20 @@ class RGBLED(LED):
         self.green_pin = self.gpio_pins['LED_G']
         self.blue_pin = self.gpio_pins['LED_B']
 
+        # Configuração de GPIO
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup([self.red_pin, self.green_pin, self.blue_pin], GPIO.OUT)
+
         # Inicializa os LEDs baseados na classe LED
-        super().__init__(config_manager, self.red_pin, self.brightness)
+        self.red_led = LED(config_manager, self.red_pin, self.brightness)
         self.green_led = LED(config_manager, self.green_pin, self.brightness)
         self.blue_led = LED(config_manager, self.blue_pin, self.brightness)
 
         # Inicializa o estado do LED com base no tipo
         self.invert_logic = self.led_type == "common_anode"
         
-        # Inicializa os LEDs com o brilho configurado
-        self.set_color(self.brightness, self.brightness, self.brightness)
+        # Inicializa os LEDs desligados
+        self.set_color(0, 0, 0)
 
     def _adjust_brightness(self, pwm_instance, brightness: int) -> None:
         """Ajusta o brilho de um LED individual usando PWM.

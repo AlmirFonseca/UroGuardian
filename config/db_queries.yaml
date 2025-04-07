@@ -95,7 +95,7 @@ ddl:
       timestamp TEXT,                                                               -- Data e hora do alerta
       alert_type TEXT,                                                              -- Tipo de alerta (ex: "Volume Baixo", "Cor Anormal")
       alert_message TEXT,                                                           -- Mensagem do alerta
-      FOREIGN KEY (urine_bag_monitoring_id) REFERENCES urine_bag_monitoring_id(id)  -- Relacionamento com a tabela de monitoramento da bolsa de urina
+      FOREIGN KEY (urine_bag_monitoring_id) REFERENCES urine_bag_monitoring(id)  -- Relacionamento com a tabela de monitoramento da bolsa de urina
     )
 
   # ----------------------------------------

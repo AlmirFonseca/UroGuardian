@@ -38,8 +38,11 @@ class LoadCell:
         dt_pin = pins.get("LOADCELL_DT")  # Data pin for HX711
         sck_pin = pins.get("LOADCELL_SCK")  # Clock pin for HX711
         
+        conf = config_manager.get("conf")
+        self.load_cell_oversampling = conf.get("load_cell_oversampling", 5)  # Default oversampling value
+        
         # Initialize HX711 object
-        self.hx711 = HX711(dout=dt_pin, pd_sck=sck_pin)
+        self.hx711 = HX711(dout_pin=dt_pin, pd_sck_pin=sck_pin)
         
         # Initialize attributes
         self.db = db
@@ -113,7 +116,7 @@ class LoadCell:
         Returns:
             float: The current weight in calibrated units (e.g., grams).
         """
-        raw_data = self.hx711.get_value(5)
+        raw_data = self.get_raw_data()
         weight = raw_data * self.calibration_factor
         weight -= self.tare_offset  # Apply tare offset
         
@@ -129,7 +132,7 @@ class LoadCell:
         Returns:
             int: The raw reading from the load cell.
         """
-        return self.hx711.get_value(5)
+        return self.hx711.get_raw_data(times=self.load_cell_oversampling)
 
     def update_calibration_in_db(self, timestamp: str, calibration_factor: float, tare_offset: float) -> None:
         """Updates the calibration data in the database.

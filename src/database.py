@@ -107,7 +107,7 @@ class Database:
             subprocess.Popen(['sqlite_web', self.db_filepath])            
             
             # Get the networks IP address of the device
-            hostname = subprocess.check_output(['hostname', '-I']).decode().strip()
+            hostname = subprocess.check_output(['hostname', '-I']).decode().strip().split()[0]
             self.logger.println(f"SQLiteWeb is running at http://{hostname}:8080", "INFO")
             
         except Exception as e:

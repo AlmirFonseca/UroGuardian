@@ -5,6 +5,10 @@ level: "VERBOSE"
 led_type: common_anode            # [common_anode, common_cathode]
 brightness: 30                    # [0-100] %
 
+# Load cell settings
+load_cell_oversampling: 5  # Oversampling for load cell readings
+
+
 # NTP Server
 ntp_server: pool.ntp.org          # NTP server address
 timezone: UTC-3                   # Timezone offset from UTC
