@@ -1,0 +1,241 @@
+
+# DDL - Data Definition Language (Criação e Estrutura das Tabelas)
+ddl:
+
+  # ----------------------------------------
+  # Tabela de dispositivos
+  # ----------------------------------------
+
+  create_table_device: |
+    CREATE TABLE IF NOT EXISTS device (
+      device_id INTEGER PRIMARY KEY AUTOINCREMENT,                   -- ID único do dispositivo
+      mac_address TEXT UNIQUE,                                -- Endereço MAC do dispositivo
+      name TEXT,                                              -- Nome do dispositivo (ex: "Sensor de Urina")
+      version TEXT,                                           -- Versão do dispositivo (ex: "1.0")
+      ip_address TEXT,                                        -- Endereço IP do dispositivo
+      status TEXT CHECK (status in ('active', 'inactive')),   -- Status do dispositivo (ativo ou inativo)
+      last_boot TEXT,                                         -- Data e hora do último boot do dispositivo
+      last_update TEXT                                        -- Data e hora da última atualização
+    )
+
+  # ----------------------------------------
+  # Tabela de controle de usuarios
+  # ----------------------------------------
+
+  # Tabela para armazenar os dados de controle manual dos usuarios
+  create_table_user: |
+    CREATE TABLE IF NOT EXISTS user (
+      user_id INTEGER PRIMARY KEY AUTOINCREMENT,                          -- ID único do Paciente
+      nfc_card_uid_hash TEXT UNIQUE,                                 -- Hash do UID do cartão NFC
+      first_use_datetime TEXT DEFAULT CURRENT_TIMESTAMP,             -- Data e hora do primeiro uso do dispositivo
+      num_data_collections INTEGER DEFAULT 1                         -- Número de coletas de dados realizadas
+    )
+
+  # ----------------------------------------
+  # Tabela de monitoramento da urina
+  # ----------------------------------------s
+
+  create_table_urine_samples: |
+    CREATE TABLE IF NOT EXISTS urine_samples (
+      sample_id INTEGER PRIMARY KEY AUTOINCREMENT,                          -- ID único da amostra
+      user_id INTEGER,                                               -- ID do usuário (relacionamento com a tabela de usuários)
+      device_id INTEGER,                                             -- ID do dispositivo (relacionamento com a tabela de dispositivos)
+      start_timestamp TEXT,                                          -- Data e hora de início da coleta da amostra
+      end_timestamp TEXT,                                            -- Data e hora de término da coleta da amostra
+      nfc_timestamp TEXT,                                            -- Timestamp do momento da leitura NFC (se houve)
+      urine_color TEXT,                                              -- Cor da urina (ex: "Amarelo", "Âmbar", "Vermelho")
+      hydration_level TEXT,                                          -- Nível de hidratação (ex: "Baixo", "Normal", "Alto")
+      FOREIGN KEY (device_id) REFERENCES device(device_id),                 -- Relacionamento com a tabela de dispositivos
+      FOREIGN KEY (user_id) REFERENCES user(user_id)                      -- Relacionamento com a tabela de usuários
+    )
+    
+  # ----------------------------------------
+  # Tabelas relacionadas a leituras de espectro
+  # ----------------------------------------
+
+  # Tabela para armazenar as leituras do espectro (dados de canais do sensor de cores e configurações de LED)
+  create_table_spectrum_datapoints: |
+    CREATE TABLE IF NOT EXISTS spectrum_datapoints (
+      spectrum_id INTEGER PRIMARY KEY AUTOINCREMENT,     -- Identificador único
+      sample_id INTEGER,                        -- ID da amostra de dados (relacionamento com a tabela urine_samples)
+      device_id INTEGER,                       -- ID do dispositivo que realizou a leitura
+      timestamp TEXT,                           -- Data e hora da leitura
+      batch INTEGER,                            -- ID do lote de amostras (1, 2, 3, ...)
+      flag INTEGER,                             -- Flag para indicar o status da leitura (1: primeira amostra, 0: amostra intermediária, -1: última amostra)
+      led_color TEXT,                           -- Cor do LED utilizado na medição (ex: "R" (red), "G" (green), "B" (blue), "W" (white), "IR" (infrared), "UV" (ultraviolet))
+      led_intensity INTEGER,                    -- Intensidade do LED (0-100%)
+      channel_415nm INTEGER,                    -- Leitura do canal de 415nm
+      channel_445nm INTEGER,                    -- Leitura do canal de 445nm
+      channel_480nm INTEGER,                    -- Leitura do canal de 480nm
+      channel_515nm INTEGER,                    -- Leitura do canal de 515nm
+      channel_555nm INTEGER,                    -- Leitura do canal de 555nm
+      channel_590nm INTEGER,                    -- Leitura do canal de 590nm
+      channel_630nm INTEGER,                    -- Leitura do canal de 630nm
+      channel_680nm INTEGER,                    -- Leitura do canal de 680nm
+      channel_clear INTEGER,                    -- Leitura do canal clear
+      channel_nir INTEGER,                      -- Leitura do canal near-infrared (NIR)
+      FOREIGN KEY (sample_id) REFERENCES urine_samples(sample_id)  -- Relacionamento com a tabela de amostras de dados
+      FOREIGN KEY (device_id) REFERENCES device(device_id)  -- Relacionamento com a tabela de dispositivos
+    )
+
+  # ----------------------------------------
+  # Tabelas relacionadas ao monitoramento do sistema
+  # ----------------------------------------
+
+  # Tabela para armazenar os dados do monitoramento do sistema (uso de CPU, RAM, rede, etc.)
+  create_table_system_telemetry: |
+    CREATE TABLE IF NOT EXISTS system_telemetry (
+      sys_telemetry_id INTEGER PRIMARY KEY AUTOINCREMENT,  -- Identificador único
+      device_id INTEGER,                     -- ID do dispositivo (relacionamento com a tabela de dispositivos)
+      timestamp TEXT,                        -- Data e hora do registro
+      cpu_usage REAL,                        -- Percentual de uso da CPU
+      cpu_temp REAL,                         -- Temperatura da CPU
+      ram_usage REAL,                        -- Percentual de uso de RAM
+      disk_usage REAL,                       -- Percentual de uso do disco
+      battery_level REAL,                    -- Nível da bateria (em %)
+      network_usage REAL,                    -- Uso de rede (em MB/s)
+      wifi_ssid TEXT,                        -- SSID da rede Wi-Fi conectada
+      wifi_signal_strength REAL,              -- Força do sinal Wi-Fi (em dBm)
+      FOREIGN KEY (device_id) REFERENCES device(device_id)  -- Relacionamento com a tabela de dispositivos
+    )
+
+  # ----------------------------------------
+  # Tabela para log de erros
+  # ----------------------------------------
+
+  create_table_logs: |
+    CREATE TABLE IF NOT EXISTS logs (
+      log_id INTEGER PRIMARY KEY AUTOINCREMENT,  -- ID único do erro
+      device_id INTEGER,                     -- ID do dispositivo associado ao erro
+      timestamp TEXT,                        -- Data e hora do erro
+      error_code TEXT,                       -- Código do erro
+      error_message TEXT,                    -- Mensagem de erro
+      FOREIGN KEY (device_id) REFERENCES device(device_id)  -- Relacionamento com a tabela de dispositivos
+    )
+
+
+dml:
+
+  # ----------------------------------------
+  # DML - Data Manipulation Language (Queries de Inserção)
+  # ----------------------------------------
+
+  # Tabela de dispositivos
+  insert_device: |
+    INSERT INTO device (mac_address, name, version, ip_address, status, last_boot, last_update)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de usuários
+  insert_user: |
+    INSERT INTO user (first_use_datetime, num_data_collections)
+    VALUES (?, ?)
+
+  # Tabela de amostras de urina
+  insert_urine_sample: |
+    INSERT INTO urine_samples (
+      user_id, device_id, start_timestamp, end_timestamp, nfc_timestamp, urine_color, hydration_level
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de leituras do espectro
+  insert_spectrum_datapoint: |
+    INSERT INTO spectrum_datapoints (
+      sample_id, timestamp, batch, flag, led_color, led_intensity,
+      channel_415nm, channel_445nm, channel_480nm, channel_515nm,
+      channel_555nm, channel_590nm, channel_630nm, channel_680nm,
+      channel_clear, channel_nir
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de monitoramento do sistema
+  insert_system_telemetry: |
+    INSERT INTO system_telemetry (
+      device_id, timestamp, cpu_usage, cpu_temp, ram_usage, disk_usage,
+      battery_level, network_usage, wifi_ssid, wifi_signal_strength
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+  # Tabela de logs de erro
+  insert_logs: |
+    INSERT INTO logs (device_id, timestamp, error_code, error_message)
+    VALUES (?, ?, ?, ?)
+
+
+
+fetch:
+
+  fetch_data: |
+    SELECT {columns} 
+    FROM {table} 
+    WHERE {condition} 
+    ORDER BY {order_by} 
+    LIMIT {limit}
+
+  fetch_device_id: |
+    SELECT device_id 
+    FROM device 
+    WHERE mac_address = ?
+    LIMIT 1
+
+  fetch_last_system_telemetry: |
+    SELECT * 
+    FROM system_telemetry 
+    WHERE device_id = ? 
+    ORDER BY timestamp DESC 
+    LIMIT 1
+
+  fetch_last_log: |
+    SELECT * 
+    FROM logs 
+    WHERE device_id = ? 
+    ORDER BY timestamp DESC 
+    LIMIT 1
+
+
+
+update:
+
+  update_data: |
+    UPDATE {table}
+    SET {set_clause}
+    WHERE {condition}
+
+
+
+mock:
+
+#   # ----------------------------------------
+#   # Queries de População - Dispositivo
+#   # ----------------------------------------
+#   populate_mock_device: |
+#     INSERT INTO device (mac_address, name, version, ip_address, status, last_update)
+#     SELECT  'd8:3a:dd:39:2c:de', 'UroGuardian MVP', '0.0.1', '192.168.0.168', 'active', '2025-03-30 08:00:00'
+#     WHERE NOT EXISTS (SELECT 1 FROM device)
+
+#   # ----------------------------------------
+#   # Queries de População - Tipo de bolsa de urina
+#   # ----------------------------------------
+#   populate_mock_urine_bag_type: |
+#     INSERT INTO urine_bag_type (brand, type, max_capacity)
+#     SELECT 'Descarpack', 'Sistema Fechado', 2000
+#     WHERE NOT EXISTS (SELECT 1 FROM urine_bag_type)
+
+#   # ----------------------------------------
+#   # Queries de População - Tabelas de Controle de Pacientes
+#   # ----------------------------------------
+#   populate_mock_patient: |
+#     INSERT INTO patient (
+#       gender, age, height, weight, renal_conditions, room, bed, observations, 
+#       urine_bag_usage_start_time, device_usage_start_time)
+#     SELECT 
+#       'M', 55, 175, 72, 'Hipertensão', 'A1', 'Leito 1', 'Paciente em tratamento de pressão alta',
+#       '2025-03-30 08:00:00', '2025-03-30 08:00:00'
+#     WHERE NOT EXISTS (SELECT 1 FROM patient)
+
+#   # ----------------------------------------
+#   # Queries de População - Bolsa de Urina
+#   # ----------------------------------------
+#   populate_mock_urine_bag: |
+#     INSERT INTO urine_bag (device_id, patient_id, urine_bag_type_id, status, start_time, end_time)
+#     SELECT 1, 1, 1, 'active', '2025-03-30 08:00:00', ''
+#     WHERE NOT EXISTS (SELECT 1 FROM urine_bag)

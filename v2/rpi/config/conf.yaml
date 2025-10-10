@@ -1,0 +1,51 @@
+
+
+mqtt:
+
+  host: "localhost" # Endereço do broker MQTT
+
+  port: 1883 # Porta do broker MQTT
+
+  keepalive: 0 # Intervalo de keepalive em segundos (0 desativa o timeout)
+
+  qos: 1 # Nível de QoS (Quality of Service)
+  
+  topics:
+    system_telemetry: 
+      - mac_address
+      - timestamp
+      - cpu_usage
+      - cpu_temp
+      - ram_usage
+      - disk_usage
+      - battery_level
+      - network_usage
+      - wifi_ssid
+      - wifi_signal_strength
+
+    logs:
+      - mac_address
+      - timestamp
+      - error_code
+      - error_message
+
+    spectrum_datapoints:
+      - mac_address
+      - timestamp
+      - batch
+      - flag
+      - led_color
+      - led_intensity
+      - channel_415nm
+      - channel_445nm
+      - channel_480nm
+      - channel_515nm
+      - channel_555nm
+      - channel_590nm
+      - channel_630nm
+      - channel_680nm
+      - channel_clear
+      - channel_nir
+
+system: WINDOWS
+# system: LINUX

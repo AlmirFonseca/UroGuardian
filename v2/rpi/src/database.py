@@ -1,0 +1,637 @@
+import sqlite3
+import subprocess
+import re
+import yaml
+import os
+import shutil
+import psutil
+import socket
+from datetime import datetime
+from flask import Flask, jsonify
+from typing import Any, Dict, Optional
+
+from src.config_manager import ConfigManager
+from src.logger import Logger
+
+class Database:
+    """Class for managing the SQLite database with dynamic queries loaded from a YAML file.
+
+    This class loads DDL and DML queries from the configuration file 'db_queries.yaml' and executes them to manage the
+    database schema and data. It provides CRUD operations to store and retrieve variables.
+
+    Attributes:
+        db_filepath (str): Path to the SQLite database file.
+        queries (Dict[str, str]): Dictionary of queries loaded from the YAML configuration file.
+        connection (sqlite3.Connection): Database connection object.
+        cursor (sqlite3.Cursor): Cursor object for executing SQL queries.
+    """
+
+    def __init__(self, config_manager: ConfigManager, 
+                 db_filepath: str = "../database/sensor_data.db", 
+                 db_queries_filepath = "../config/db_queries.yaml",
+                 web_interface: bool = True) -> None:
+        """Initializes the database connection and loads queries.
+
+        Args:
+            config_manager (ConfigManager): The ConfigManager instance to load queries.
+            db_filepath (str, optional): Path to the SQLite database file. Default is "../database/sensor_data.db".
+            db_queries_filepath (str, optional): Path to the YAML file containing queries. Default is "../config/db_queries.yaml".
+
+        Raises:
+            FileNotFoundError: If the queries file doesn't exist.
+        """        
+        self.config_manager = config_manager
+        self.logger = Logger()
+        
+        self.db_filepath = self.config_manager.get("conf").get("db_filepath")
+        if not self.db_filepath:
+            self.db_filepath = db_filepath
+            
+        self.db_queries_filepath = self.config_manager.get("conf").get("db_queries_filepath")
+        if not self.db_queries_filepath:
+            self.db_queries_filepath = db_queries_filepath
+            
+        # If the folder does not exist, create it
+        if not os.path.exists(os.path.dirname(self.db_filepath)):
+            os.makedirs(os.path.dirname(self.db_filepath))
+        
+        self.queries = self.load_queries()
+        self.connection = sqlite3.connect(self.db_filepath, check_same_thread=False)
+        self.cursor = self.connection.cursor()
+
+        self.initialize_db()
+        
+        # Debug: Load mock data if specified in the configuration
+        if self.config_manager.get("conf").get("load_mock_data"):
+            self.logger.println("Inserting mock data...", "DEBUG")
+            self.mock_data()
+
+        # Open SQLiteWeb interface for debugging using sqlite-web
+        if web_interface:
+            self.start_sqlite_web()
+        
+        self.logger.println("Database initialized successfully.", "INFO")
+
+    def load_queries(self) -> Dict[str, str]:
+        """Load DDL and DML queries from the 'db_queries.yaml' configuration file.
+
+        Returns:
+            Dict[str, str]: Dictionary of queries.
+            
+        Raises:
+            FileNotFoundError: If the queries file doesn't exist.
+        """
+        
+        if not os.path.exists(self.db_queries_filepath):
+            raise FileNotFoundError(f"Queries file '{self.db_queries_filepath}' not found.")
+        
+        with open(self.db_queries_filepath, "r") as file:
+            return yaml.safe_load(file)
+
+    def initialize_db(self) -> None:
+        """Initializes the database schema by executing DDL queries from the loaded configuration.
+
+        Returns:
+            None
+        """
+        ddl_queries = self.queries.get("ddl", {})
+        for query_key, query in ddl_queries.items():
+            self.execute_query(query_key, query)
+
+    def execute_query(self, query_key: str, query: str, params: tuple = (), return_last_row_id: bool = False) -> None:
+        """Execute a query (INSERT, SELECT, etc.) on the database. 
+
+        Args:
+            query_key (str): The key identifying the query.
+            query (str): SQL query to execute.
+            params (tuple, optional): Parameters for the SQL query (default is an empty tuple).
+            return_last_row_id (bool, optional): Whether to return the last inserted row ID (default is False).
+        
+        Returns:
+            None
+        """
+        self.logger.println(f"Executing query: {query_key}", "DEBUG")
+        
+        with self.connection:
+            cursor = self.connection.cursor()
+            try:
+                cursor.execute(query, params)
+                self.connection.commit()
+            except sqlite3.Error as e:
+                self.logger.println(f"Error executing query: {e}", "ERROR")
+                self.logger.println(f"Query: {query}", "ERROR")
+                self.logger.println(f"Params: {params}", "ERROR")
+                # Optionally, you can raise the error or handle it as needed
+                # raise e
+            else:
+                if return_last_row_id:
+                    return cursor.lastrowid
+
+    def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
+        """Fetch a single result from a query.
+
+        Args:
+            query_key (str): The key identifying the query.
+            query (str): SQL query to execute.
+            params (tuple, optional): Parameters for the SQL query (default is an empty tuple).
+        
+        Returns:
+            Any: The fetched result.
+            
+        Raises:
+            ValueError: If the query key is not found.
+        """
+        query = self.queries.get("fetch", {}).get(query_key) if not query else query
+        
+        if not query:
+            raise ValueError(f"Fetch query with key '{query_key}' not found.")
+        
+        self.logger.println(f"Fetching one result for query: {query_key}", "DEBUG")
+        
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        
+        return cursor.fetchone()
+
+    def fetch_all(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
+        """Fetch all results from a query.
+
+        Args:
+            query_key (str): The key identifying the query.
+            query (str): SQL query to execute.
+            params (tuple, optional): Parameters for the SQL query (default is an empty tuple).
+        
+        Returns:
+            Any: The fetched results.
+            
+        Raises:
+            ValueError: If the query key is not found.
+        """
+        query = self.queries.get("fetch", {}).get(query_key) if not query else query
+        
+        if not query:
+            raise ValueError(f"Fetch query with key '{query_key}' not found.")
+        
+        self.logger.println(f"Fetching all results for query: {query_key}", "DEBUG")
+        
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        
+        return cursor.fetchall()
+
+    def insert_data_with_query(self, query_key: str, table: str, data: Dict[str, Any]) -> None:
+        """Insert data into the specified table.
+
+        Args:
+            query_key (str): The key identifying the insert query.
+            table (str): Table name.
+            data (Dict[str, Any]): Data to insert, as a dictionary.
+        
+        Returns:
+            None
+            
+        Raises:
+            ValueError: If the query key is not found.
+        """
+        query = self.queries.get("dml", {}).get(query_key)
+        if not query:
+            raise ValueError(f"Insert query with key '{query_key}' not found.")
+        
+        columns = ', '.join(data.keys())
+        placeholders = ', '.join(['?'] * len(data))
+        
+        query = query.format(table=table, columns=columns, placeholders=placeholders)
+        
+        self.execute_query(query_key, query, tuple(data.values()))
+        
+    def insert_dict_into_table(self, table_name: str, data: dict, query_key: str = "UNK") -> None:
+        """
+        Insere um registro genérico em qualquer tabela do banco SQLite.
+
+        Args:
+            table_name (str): Nome da tabela destino.
+            data (dict): Dicionário de campos e valores.
+            query_key (str): Identificador da query
+
+        Returns:
+            None
+            
+        Raises:
+            ValueError: Se os dados forem inválidos.
+        """
+        if not data or not isinstance(data, dict):
+            raise ValueError("Os dados para inserir devem ser um dicionário não vazio.")
+
+        fields = ",".join(data.keys())
+        placeholders = ",".join(["?"] * len(data))
+        values = tuple(data.values())
+        
+        query = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
+        
+        self.execute_query(query_key, query, values)
+
+    def update_data(self, query_key: str, table: str, data: Dict[str, Any], condition: Optional[str] = "1=1") -> None:
+        """Update data in the specified table based on a condition.
+
+        Args:
+            query_key (str): The key identifying the update query.
+            table (str): Table name.
+            data (Dict[str, Any]): Data to update, as a dictionary.
+            condition (str): Condition for the update (e.g., 'id = 1').
+
+        Returns:
+            None
+            
+        Raises:
+            ValueError: If the query key is not found.
+        """
+        query = self.queries.get("update", {}).get(query_key)
+        if not query:
+            raise ValueError(f"Update query with key '{query_key}' not found.")
+        
+        set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
+        query = query.format(table=table, set_clause=set_clause, condition=condition)        
+        self.execute_query(query_key, query, tuple(data.values()))
+        
+    def mock_data(self) -> None:
+        """Load mock data into the database for testing purposes.
+
+        Returns:
+            None
+        """
+        mock_data_queries = self.queries.get("mock", {})
+        for query_key, query in mock_data_queries.items():
+            self.execute_query(query_key, query)
+            
+    def show_table(self, table: str) -> None:
+        """Display the contents of the specified table.
+
+        Args:
+            table (str): Table name.
+        
+        Returns:
+            None
+        """
+        
+        self.logger.println(f"Contents of table '{table}':", "INFO")
+        
+        query = f"SELECT * FROM {table}"
+        rows = self.fetch_all("show_table", query)
+        
+        for row in rows:
+            print(row)
+            
+    def show_table_structure(self, table: str) -> None:
+        """Display the structure of the specified table.
+
+        Args:
+            table (str): Table name.
+        
+        Returns:
+            None
+        """        
+        self.logger.println(f"Structure of table '{table}':", "INFO")
+        
+        query = f"PRAGMA table_info({table})"
+        columns = self.fetch_all("show_table_structure", query)
+        
+        for column in columns:
+            print(column)
+
+    def backup_database(self, backup_dir: str = "backups") -> None:
+        """Create a backup of the current database with a timestamp in the filename.
+
+        Args:
+            backup_dir (str, optional): Directory where the backup will be stored. Default is 'backups'..
+        
+        Returns:
+            None
+        """
+        # Ensure the backup directory exists
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+
+        # Get the current date and time for the backup filename
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        backup_file = os.path.join(backup_dir, f"backup_{timestamp}.db")
+
+        # Copy the database to the backup file
+        shutil.copy(self.db_filepath, backup_file)
+        self.logger.println(f"Backup created at: {backup_file}", "INFO")
+
+    def close(self) -> None:
+        """Close the database connection.
+
+        Returns:
+            None
+        """
+        self.connection.close()
+        
+        self.logger.println("Database connection closed.", "INFO")
+        
+    def describe_database(self) -> Dict[str, Any]:
+        """
+        Describes the structure of the SQLite database, returning tables, columns, types, 
+        primary keys and foreign keys.
+
+        Returns:
+            Dict[str, Any]: A dictionary describing the entire database schema.
+        """
+        self.logger.println("Describing database schema...", "INFO")
+
+        schema = {}
+        
+        # Get all tables from the SQLite master
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row[0] for row in cursor.fetchall()]
+
+        for table in tables:
+            self.logger.println(f"Analyzing table: {table}", "DEBUG")
+            
+            schema[table] = {
+                "columns": [],
+                "foreign_keys": []
+            }
+
+            # Get columns information
+            cursor.execute(f"PRAGMA table_info({table});")
+            columns_info = cursor.fetchall()
+            
+            for column in columns_info:
+                col_info = {
+                    "id": column[0],
+                    "name": column[1],
+                    "type": column[2],
+                    "notnull": bool(column[3]),
+                    "default": column[4],
+                    "primary_key": bool(column[5])
+                }
+                schema[table]["columns"].append(col_info)
+
+            # Get foreign keys information
+            cursor.execute(f"PRAGMA foreign_key_list({table});")
+            foreign_keys_info = cursor.fetchall()
+            
+            for fk in foreign_keys_info:
+                fk_info = {
+                    "id": fk[0],
+                    "seq": fk[1],
+                    "table": fk[2],
+                    "from": fk[3],
+                    "to": fk[4],
+                    "on_update": fk[5],
+                    "on_delete": fk[6],
+                    "match": fk[7]
+                }
+                schema[table]["foreign_keys"].append(fk_info)
+
+        self.logger.println("Database schema description completed.", "INFO")
+
+        return schema
+        
+    def get_last_inserted_id(self, table: str) -> int:
+        """Get the last inserted ID from the specified table.
+
+        Args:
+            table (str): The name of the table.
+        
+        Returns:
+            int: The last inserted ID.
+            
+        Raises:
+            ValueError: If the table does not exist or if the ID cannot be retrieved.
+        """
+        
+        query = f"SELECT last_insert_rowid() FROM {table}"
+        last_id = self.fetch_one("get_last_inserted_id", query)
+        
+        if last_id is None:
+            return 0
+        else:
+            return last_id[0]
+        
+    def get_mac_address(self) -> Optional[str]:
+        """Fetch the MAC address of the Raspberry Pi from the network interface.
+        
+        Args:
+            None
+        
+        Returns:
+            str: The MAC address (if found), or None if not found.
+            
+        Raises:
+            ValueError: If the MAC address cannot be retrieved.
+        """
+        try:
+            # Run the ifconfig command and capture the output
+            result = subprocess.run(['ifconfig', 'wlan0'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = result.stdout.decode('utf-8')
+            
+            # Use regex to find the MAC address (ether xx:xx:xx:xx:xx:xx)
+            match = re.search(r'ether ([0-9a-fA-F:]{17})', output)
+            if match:
+                return match.group(1)  # Return the MAC address found
+            return None
+        except Exception as e:
+            raise ValueError(f"Error while retrieving MAC address: {str(e)}")
+
+
+    def get_device_id(self, mac_address: str) -> Optional[str]:
+        """Get the device ID from the system according to the mac_address
+        
+        Args:
+            mac_address (str): The MAC address of the device.
+
+        Returns:
+            str: The device ID.
+        
+        Raises:
+            ValueError: If the device ID is not found or if the device ID is not set.
+        """
+        self.logger.println(f"Getting device_id of MAC Address: {mac_address}", "DEBUG")
+
+        try:
+            # Get the device ID from the device table where mac_address matches
+            fetch_result = self.fetch_one("fetch_device_id", params=(mac_address,))
+            self.device_id = fetch_result[0] if fetch_result else None
+
+            # If the device wasn't registered yet, return None
+            if not self.device_id:
+                self.logger.println(f"Device with MAC Address {mac_address} not registered yet. Registering now.", "WARNING")
+                
+                device_id = self.insert_device(mac_address)
+                
+                self.logger.println(f"Dispositivo (MAC {mac_address}) cadastrado automaticamente. ID: {device_id}", "INFO")
+
+                self.device_id = device_id
+            
+            self.logger.println(f"Retrieved Device ID: {self.device_id} ({type(self.device_id)})", "DEBUG")
+            
+            return self.device_id
+        except Exception as e:
+            self.logger.println(f"Error getting device ID: {e}", "ERROR")
+            return None
+        
+    def insert_device(self, mac_address: str) -> int:
+        """
+        Insere um novo dispositivo na tabela device e retorna o device_id criado.
+        """
+        query_key = "insert_device"
+        values = (mac_address, "Unknown", "Unknown", "Unknown", "active", "Unknown", "Unknown")
+
+        return self.execute_query(query_key,
+                           self.queries["dml"][query_key],
+                           values,
+                           return_last_row_id=True)
+        
+    def get_urine_bag_id(self, force_update: bool = False) -> Optional[str]:
+        """Get the urine bag ID from the urine_bag table according to the device ID and where 'status' is 'active'
+        
+        Args:
+            force_update (bool): If True, forces an update of the urine bag ID.
+            
+        Returns:
+            str: The urine bag ID.
+            
+        Raises:
+            ValueError: If the urine bag ID is not found or if the device ID is not set.
+        """
+        
+        if self.urine_bag_id and not force_update:
+            return self.urine_bag_id
+        
+        try:
+            # Get the urine bag ID from the urine_bag table where device_id matches and status is active
+            query = "SELECT id FROM urine_bag WHERE device_id = ? AND status = 'active'"
+            
+            self.urine_bag_id = self.fetch_one("get_urine_bag_id", query, (self.device_id,))[0]
+            
+            self.logger.println(f"Retrieved Urine Bag ID: {self.urine_bag_id} ({type(self.urine_bag_id)})", "DEBUG")
+            
+            return self.urine_bag_id
+        except Exception as e:
+            self.logger.println(f"Error getting urine bag ID: {e}", "ERROR")
+            return None
+        
+    def count_query_params(self, query: str) -> int:
+        """
+        Counts the number of parameters in a SQL query by counting the number of question marks
+        """
+        return query.count("?")
+    
+    def start_sqlite_web(self, host: str = "0.0.0.0", port: int = 8080) -> None:
+        """
+        Start sqlite-web interface for this database file via subprocess.
+
+        Args:
+            host (str): Host address to serve sqlite-web ("0.0.0.0" to access from network).
+            port (int): Port number for the web interface.
+
+        Returns:
+            None
+        """
+        try:
+            # Optionally kill previous sqlite_web instance (if needed)
+            if self.config_manager.get("conf").get("system") == "LINUX":
+                subprocess.run(['pkill', '-f', 'sqlite_web'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            elif self.config_manager.get("conf").get("system") == "WINDOWS":
+                for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+                    try:
+                        if 'sqlite_web' in ' '.join(proc.info["cmdline"]):
+                            proc.kill()
+                    except Exception:
+                        pass
+            
+            cmd = [
+                "python",
+                "-m",
+                "sqlite_web",
+                "--host", host,
+                "--port", str(port),
+                self.db_filepath
+            ]
+            subprocess.Popen(cmd)
+            
+            if self.config_manager.get("conf").get("system") == "LINUX":
+                try:
+                    # Get actual device IP for easier access instructions (Linux only)
+                    network_ip = subprocess.check_output(['hostname', '-I']).decode().strip().split()[0]
+                except Exception:
+                    pass
+                
+            elif self.config_manager.get("conf").get("system") == "WINDOWS":
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    ip = s.getsockname()[0]
+                    s.close()
+                    network_ip = ip
+                except Exception:
+                    network_ip = "localhost"
+
+            self.logger.println(
+                f"[sqlite-web] Running at http://{network_ip}:{port} -- Database file: {self.db_filepath}",
+                "INFO"
+            )
+        except Exception as e:
+            self.logger.println(f"Failed to start sqlite-web: {e}", "ERROR")
+            
+    def create_sample(self, device_id, start_timestamp):
+        """
+        Cria uma nova amostra de urina no banco de dados.
+
+        Args:
+            device_id (int): ID do dispositivo associado à amostra.
+            start_timestamp (str): Timestamp de início da coleta da amostra.
+
+        Returns:
+            int: ID da amostra criada.
+        """
+        # Organiza os valores na ordem correta
+        values = (None, device_id, start_timestamp, None, None, None, None)
+        
+        # Insere a nova amostra e retorna o ID gerado utilizando uma query pré-definida
+        return self.execute_query("insert_urine_sample",
+                                self.queries["dml"]["insert_urine_sample"],
+                                values,
+                                return_last_row_id=True)
+
+    def close_sample(self, sample_id, end_timestamp):
+        """
+        Fecha uma amostra de urina no banco de dados.
+
+        Args:
+            sample_id (int): ID da amostra a ser fechada.
+            end_timestamp (str): Timestamp de término da coleta da amostra.
+
+        Returns:
+            None
+        """
+        # Atualiza o timestamp de término da amostra
+        query = "UPDATE urine_samples SET end_timestamp = ? WHERE sample_id = ?"
+        self.execute_query("close_sample", query, (end_timestamp, sample_id))
+
+    def insert_spectrum_datapoint(self, data: dict):
+        """
+        Insere um datapoint de espectro na tabela spectrum_datapoints.
+
+        Args:
+            data (dict): Dicionário contendo os dados do datapoint.
+
+        Returns:
+            None
+        """
+        # Define os campos esperados e organiza os valores na ordem correta
+        fields = [
+            "sample_id", "timestamp", "batch", "flag", "led_color", "led_intensity",
+            "channel_415nm", "channel_445nm", "channel_480nm", "channel_515nm",
+            "channel_555nm", "channel_590nm", "channel_630nm", "channel_680nm",
+            "channel_clear", "channel_nir"
+        ]
+        values = tuple(data.get(f) for f in fields)
+        
+        # Insere o datapoint utilizando uma query pré-definida
+        self.execute_query("insert_spectrum_datapoint",
+                        self.queries["dml"]["insert_spectrum_datapoint"],
+                        values)
