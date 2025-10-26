@@ -59,7 +59,7 @@ class Logger:
         """
         config_manager = ConfigManager()
         logging_config = config_manager.get("conf")
-        level_str = logging_config.get("level", "INFO")
+        level_str = logging_config.get("debug_level", "INFO")
         self.level = self.LEVELS.get(level_str.upper(), 2)
         self.show_tag = True
 

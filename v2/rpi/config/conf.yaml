@@ -1,8 +1,8 @@
-
+debug_level: "INFO"
 
 mqtt:
 
-  host: "localhost" # Endereço do broker MQTT
+  host: "192.168.0.168" # Endereço do broker MQTT
 
   port: 1883 # Porta do broker MQTT
 
@@ -14,20 +14,21 @@ mqtt:
     system_telemetry: 
       - mac_address
       - timestamp
-      - cpu_usage
-      - cpu_temp
+      - uptime_ms
+      - cpu_frequency
       - ram_usage
-      - disk_usage
-      - battery_level
-      - network_usage
+      - temp
       - wifi_ssid
-      - wifi_signal_strength
+      - wifi_signal
+      - ip
+      - sketch_md5
+      # - battery_level
 
     logs:
       - mac_address
       - timestamp
-      - error_code
-      - error_message
+      - code
+      - message
 
     spectrum_datapoints:
       - mac_address
@@ -49,3 +50,9 @@ mqtt:
 
 system: WINDOWS
 # system: LINUX
+
+sqlite_web_interface: false
+app_web_interface: true
+
+nfc:
+  nfc_timeout: 20 # Tempo limite em segundos para leitura NFC (0 desativa o timeout)

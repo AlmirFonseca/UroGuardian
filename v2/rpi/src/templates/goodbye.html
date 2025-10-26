@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Finalização</title>
+  <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="center">
+    <h2>{{ message }}</h2>
+    <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" alt="OK" style="width:70px;">
+    <p>Evento registrado com sucesso.</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,211 @@
+/* Color pallete for UroGuardian Webpage */
+:root {
+    --red: #92140C;
+    --yellow: #FB8500;
+    --lightyellow: #FDE74C;
+    --darkgrey: #1D1D1D;
+    --gray: #949494;
+    --lightgray: #e0e0e0;
+    --white: #FFFFFF;
+    --blue: #054A91;
+    --lightblue: #3E7CB1;
+    --green: #0CCE6B;
+    --lightgreen: #63A375;
+    --pink: #CA6680;
+}
+
+
+body {
+    background: var(--white);
+    color: var(--darkgrey);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.center {
+    text-align: center;
+}
+
+.spinner {
+    border: 8px solid #eee;
+    border-top: 8px solid var(--blue);
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin: 10px;
+}
+
+.history-table {
+    border-collapse: collapse;
+    width: 80%;
+    margin: auto;
+}
+
+.history-table th,
+.history-table td {
+    border: 1px solid #ccc;
+    padding: 6px 12px;
+}
+
+
+h2 {
+    font-size: 42pt;
+}
+
+.chart {
+    text-align: center;
+    margin: 18px 0;
+}
+
+.log-table {
+    border-collapse: collapse;
+    width: 80%;
+    margin: auto;
+}
+
+.log-table th,
+.log-table td {
+    border: 1px solid #999;
+    padding: 4px 10px;
+}
+
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.main-layout {
+    display: flex;
+    height: 100vh;
+}
+
+.left-panel {
+    width: 65%;
+    padding: 50px 60px 25px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    background: var(--white);
+}
+
+.right-panel {
+    width: 35%;
+    background: var(--darkgrey);
+    color: var(--white);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo {
+    font-weight: bold;
+    font-size: 2.5em;
+    color: var(--blue);
+    margin-top: 0;
+    margin-bottom: 0.2em;
+}
+
+.slogan {
+    font-size: 1.5em;
+    font-weight: normal;
+    font-style: italic;
+    color: var(--darkgray);
+    margin-top: 0;
+    margin-bottom: 2em;
+}
+
+main {
+    display: flex;
+    flex-grow: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.instruction {
+    font-size: 1.5em;
+    margin-top: 0;
+    margin-bottom: 2em;
+}
+
+.main-illustration {
+    width: 300px;
+    max-width: 90%;
+    margin-bottom: 1em;
+    margin-left: 0;
+}
+
+footer {
+    margin-top: auto;
+}
+
+.consent {
+    color: var(--darkgrey);
+    font-size: 0.92em;
+    background: var(--lightgray);
+    padding: 16px 20px;
+    border-radius: 9px;
+    margin-top: 22px;
+    box-shadow: 0 0 5px var(--gray);
+}
+
+.invite {
+    font-size: 1.3em;
+    margin-bottom: 35px;
+    text-align: center;
+    margin: 0 20px 20px 20px;
+    color: var(--white);
+}
+
+.qr-container img {
+    background: var(--white);
+    border-radius: 8px;
+    width: 300px;
+    height: 300px;
+    box-shadow: 0 0 22px rgba(41, 185, 255, 0.12);
+}
+
+.project-link {
+    margin-top: 1.5em;
+    text-align: center;
+    font-size: 1.0em;
+    color: var(--white);
+    margin: 0 20px 0 20px;
+    font-style: italic;
+    font-weight: normal;
+}
+
+.blue-text {
+    color: var(--blue);
+}
+
+main.center {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+main.center .logo {
+    font-weight: bold;
+    font-size: 2.6em;
+    color: var(--blue);
+    margin-bottom: 0.4em;
+}
+
+main.center .slogan {
+    font-size: 1.5em;
+    font-style: italic;
+    color: var(--darkgray);
+    margin-bottom: 2em;
+}

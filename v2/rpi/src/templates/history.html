@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Histórico do Usuário</title>
+  <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .summary { margin:36px auto 20px auto; padding:20px; background:#f4fafd; border-radius:7px;}
+    .history-table { border-collapse:collapse; width:100%; margin:auto;}
+    .history-table th, .history-table td { border:1px solid #ccc; padding:6px 12px; }
+    .history-table th { background:#eaf2fa; }
+    h1, h2 { margin-bottom:0.6em; margin-top:1.2em;}
+    .tip {color:#32395b; font-style:italic}
+  </style>
+</head>
+<body>
+  <h1>Histórico do usuário #{{ user_id }}</h1>
+  <div class="summary">
+    <b>Cartão NFC (hash):</b> {{ user_info.nfc_card_uid_hash }}<br>
+    <b>Primeiro acesso:</b> {{ user_info.first_use_datetime if user_info else '(desconhecido)' }}<br>
+    <b>Total de coletas:</b> {{ user_info.num_data_collections if user_info else '0' }}<br>
+    <span class="tip">As linhas abaixo mostram todas as medições associadas ao seu perfil anonimizado.</span>
+  </div>
+  <table class="history-table">
+    <tr>
+      <th>Amostra</th>
+      <th>Início</th>
+      <th>Fim</th>
+      <th>Data do ponto</th>
+      <th>Batch</th>
+      <th>LED</th>
+      <th>Intensidade</th>
+      <th>Canal 415nm</th>
+      <th>445nm</th>
+      <th>480nm</th>
+      <th>515nm</th>
+      <th>555nm</th>
+      <th>590nm</th>
+      <th>630nm</th>
+      <th>680nm</th>
+      <th>Clear</th>
+      <th>NIR</th>
+      <th>Status</th>
+    </tr>
+    {% for row in history %}
+      <tr>
+        <td>{{ row.sample_id }}</td>
+        <td>{{ row.start_timestamp }}</td>
+        <td>{{ row.end_timestamp }}</td>
+        <td>{{ row.datapoint_timestamp }}</td>
+        <td>{{ row.batch }}</td>
+        <td>{{ row.led_color }}</td>
+        <td>{{ row.led_intensity }}</td>
+        <td>{{ row.channel_415nm }}</td>
+        <td>{{ row.channel_445nm }}</td>
+        <td>{{ row.channel_480nm }}</td>
+        <td>{{ row.channel_515nm }}</td>
+        <td>{{ row.channel_555nm }}</td>
+        <td>{{ row.channel_590nm }}</td>
+        <td>{{ row.channel_630nm }}</td>
+        <td>{{ row.channel_680nm }}</td>
+        <td>{{ row.channel_clear }}</td>
+        <td>{{ row.channel_nir }}</td>
+        <td>
+          {% if row.flag==1 %}Início
+          {% elif row.flag==0 %}Interm.
+          {% elif row.flag==-1 %}Final
+          {% else %}---{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

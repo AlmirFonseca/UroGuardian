@@ -36,14 +36,13 @@
 // Pinos e parâmetros de hardware
 #define TRIGGER_PIN 6          // Pino digital para trigger de consulta (LOW ativa coleta)
 #define LED_PIN 7              // Pino de controle do LED SK6812
-#define BUILTIN_LED_PIN 48     // Pino do LED embutido do ESP32
 #define NUM_LEDS 1             // Número de LEDs RGBW no sistema
 #define LED_INTENSITY_PCT 100   // Intensidade do LED (em %)
 #define I2C_SDA 9              // Pino I2C - SDA
 #define I2C_SCL 8              // Pino I2C - SCL
 
 // Sensor AS7341
-#define AS7341_GAIN AS7341_GAIN_128X // Ganho em 0_5X, 1X, 2X, 4X, 8X, 16X, 32X, 64X, 128X, 256X, 512X
+#define AS7341_GAIN AS7341_GAIN_512X // Ganho em 0_5X, 1X, 2X, 4X, 8X, 16X, 32X, 64X, 128X, 256X, 512X
 // #define AS7341_ASTEP 999 // Integration time ((ASTEP_VALUE+1) * 2.78 uS)
 // #define AS7341_ATIME 100 // Integration step count (Total = (ATIME + 1) * (ASTEP + 1) * 2.78µS)
 
@@ -57,9 +56,9 @@
 #define WIFI_PASSWORD "N5Qfqaufwb"
 #define MQTT_BROKER_IP "192.168.0.168"
 #define MQTT_PORT 1883
-#define MQTT_TOPIC_DATA "spectrum_datapoints"
+#define MQTT_TOPIC_DATA "spectrumdatapoints"
 #define MQTT_TOPIC_LOG "logs"
-#define MQTT_TOPIC_TELEMETRY "system_telemetry"
+#define MQTT_TOPIC_TELEMETRY "telemetry"
 
 // === OBJETOS GLOBAIS E ESTRUTURAS ===
 
@@ -79,7 +78,7 @@ RTC_DS3231 rtc;
  * Objeto para strip de LED SK6812 RGBW.
  * Controla as cores de sinalização durante ciclo de coleta.
  */
-Adafruit_NeoPixel led(NUM_LEDS, LED_PIN, NEO_GRBW + NEO_KHZ800);
+Adafruit_NeoPixel led(NUM_LEDS, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
 /**
  * Cliente de rede para comunicação com broker MQTT.
@@ -128,8 +127,8 @@ void logMsg(String msg, String code, bool timestamp=true)
         String payload = "{";
         payload += "\"mac_address\":\"" + macAddress + "\",";
         payload += "\"timestamp\":" + String(timestamp ? rtc.now().unixtime() : 0) + ",";
-        payload += "\"code\":\"" + code + "\",";
-        payload += "\"message\":\"" + msg + "\"";
+        payload += "\"error_code\":\"" + code + "\",";
+        payload += "\"error_message\":\"" + msg + "\"";
         payload += "}";
         mqttClient.publish(MQTT_TOPIC_LOG, payload.c_str());
     }
@@ -239,11 +238,8 @@ void setLedColor(const String &color)
 
     led.fill(rgbw, 0, NUM_LEDS);
     led.show();
-}
-
-void clearLedColor()
-{
-    led.clear(); // Apaga LED
+    delay(50); // Delay para estabilizar
+    led.clear(); // Apaga LED após sinalização
     led.show();
 }
 
@@ -252,22 +248,22 @@ void clearLedColor()
  *
  * @param color Cor do LED utilizada ("R", "G", "B", "W")
  * @param batch Identificador do lote de coleta
+ * @param flag Identificador da posição (1=primeira, 0=intermediária, -1=última)
  */
-void collectDatapoint(const String &color, uint8_t batch)
+void collectDatapoint(const String &color, uint8_t batch, int8_t flag)
 {
     // setLedColor(color);
     SpectrumDatapoint dp;
-
-    setLedColor(color);
 
     delay(100);
 
     as7341.readAllChannels(dp.channels);
 
-    clearLedColor();
+
 
     dp.timestamp = rtc.now().unixtime();
     dp.batch = batch;
+    dp.flag = flag;
     dp.ledcolor = color;
     dp.ledintensity = LED_INTENSITY_PCT;
 
@@ -290,10 +286,11 @@ void sendTelemetry()
     doc["cpu_frequency"] = ESP.getCpuFreqMHz();
     doc["ram_usage"] = (float)ESP.getFreeHeap() / (float)ESP.getHeapSize() * 100.0;
     doc["temp"] = rtc.getTemperature();
-    doc["wifi_ssid"] = WiFi.SSID();
+    doc["wifi-ssid"] = WiFi.SSID();
     doc["wifi_signal"] = WiFi.RSSI();
     doc["ip"] = WiFi.localIP().toString();
     doc["sketch_md5"] = ESP.getSketchMD5();
+    doc["sketch_size"] = ESP.getSketchSize();
 
     char payload[384];
     size_t n = serializeJson(doc, payload, sizeof(payload));
@@ -313,7 +310,7 @@ void sendTelemetry()
 void sendBatchData(uint8_t batchCount) {
     // Calcula o tamanho apropriado do documento
     StaticJsonDocument<2048> doc; // tamanho grande para muitos pontos; ajuste conforme o uso
-    JsonArray arr = doc.createNestedArray("datapoints");
+    JsonArray arr = doc.createNestedArray("batch");
 
     uint8_t num_datapoints = batchCount * 4; // 4 cores por batch
 
@@ -322,59 +319,27 @@ void sendBatchData(uint8_t batchCount) {
         uint8_t idx = (bufferHead + BUFFER_SIZE - num_datapoints + i) % BUFFER_SIZE;
         const SpectrumDatapoint &data = batchData[idx];
         JsonObject dp = arr.createNestedObject();
-
-        // Sample identifiers
-        dp["mac_address"] = macAddress;
         dp["timestamp"] = data.timestamp;
         dp["batch"] = data.batch;
-        
-        // Sample attributes
-        if (i == 0)
-            dp["flag"] = 1;
-        else if (i == num_datapoints - 1)
-            dp["flag"] = -1;
-        else
-            dp["flag"] = 0;
-        dp["led_color"] = data.ledcolor;
-        dp["led_intensity"] = data.ledintensity;
-
-        // Spectral channels
-        dp["channel_415nm"] = data.channels[0];
-        dp["channel_445nm"] = data.channels[1];
-        dp["channel_480nm"] = data.channels[2];
-        dp["channel_515nm"] = data.channels[3];
-        // Skip the 5th and 6th channels (duplicates of the 10th and 11th)
-        dp["channel_555nm"] = data.channels[6];
-        dp["channel_590nm"] = data.channels[7];
-        dp["channel_630nm"] = data.channels[8];
-        dp["channel_680nm"] = data.channels[9];
-        dp["channel_clear"] = data.channels[10];
-        dp["channel_nir"] = data.channels[11];
-
-    }
-
-    // Iterate over each datapoints of the json array, serializing and publishing each one individually
-    for (JsonObject dp : arr) {
-        char payload[512];
-        size_t n = serializeJson(dp, payload, sizeof(payload));
-
-        if (mqttClient.connected()) {
-            mqttClient.publish(MQTT_TOPIC_DATA, payload, n);
-            Serial.println("spectrum_datapoint sent: " + String(payload));
-        } else {
-            Serial.println("spectrum_datapoint not sent, MQTT not connected");
+        dp["flag"] = data.flag;
+        dp["ledcolor"] = data.ledcolor;
+        dp["ledintensity"] = data.ledintensity;
+        // Adiciona os canais como array
+        JsonArray chArr = dp.createNestedArray("channels");
+        for (uint8_t c = 0; c < 12; c++) {
+            chArr.add(data.channels[c]);
         }
     }
 
-    // char payload[2048];
-    // size_t n = serializeJson(doc, payload, sizeof(payload));
+    char payload[2048];
+    size_t n = serializeJson(doc, payload, sizeof(payload));
 
-    // if (mqttClient.connected()) {
-    //     mqttClient.publish(MQTT_TOPIC_DATA, payload, n);
-    //     Serial.println("spectrum_datapoint sent: " + String(payload));
-    // } else {
-    //         Serial.println("spectrum_datapoint not sent, MQTT not connected");
-    // }
+    if (mqttClient.connected()) {
+        mqttClient.publish(MQTT_TOPIC_DATA, payload, n);
+        Serial.println("spectrum_datapoint sent: " + String(payload));
+    } else {
+            Serial.println("spectrum_datapoint not sent, MQTT not connected");
+    }
 
     delay(50);
 }
@@ -454,9 +419,6 @@ void setup() {
     int setupResults = 1;
 
     // Configura pino do trigger
-    pinMode(BUILTIN_LED_PIN, OUTPUT); // Configura pino do LED embutido
-    digitalWrite(BUILTIN_LED_PIN, HIGH);
-
     pinMode(TRIGGER_PIN, INPUT);
 
     // Inicializa RTC e sensores, conecta WiFi e MQTT
@@ -488,21 +450,34 @@ void setup() {
  */
 void loop()
 {
-    digitalWrite(BUILTIN_LED_PIN, HIGH);
-
     bool triggerLow = digitalRead(TRIGGER_PIN) == LOW;
     uint8_t batchCount = 0; // Reinicia batch ao acordar
+
+    // Turn on as7341 led on maximum brightness
+    // as7341.enableLED(true); // Liga LED interno do AS7341
+    // as7341.setLEDCurrent(100); // Máxima corrente (100mA)
+
+    // Turn on RGBW led on maximum brightness
+    // rgbw.setBrightness(100); // Máxima intensidade (100%)
+    // rgbw.show();
+
+
+    uint32_t rgbw = led.Color(255, 255, 255, 255);
+    led.fill(rgbw, 0, NUM_LEDS);
+    led.show();
 
     if (triggerLow || bufferCount > 0)
     {
         // Coleta automática enquanto trigger está ativo (LOW)
         while (digitalRead(TRIGGER_PIN) == LOW && batchCount < BATCH_SIZE)
         {
-
-            collectDatapoint("R", batchCount);
-            collectDatapoint("G", batchCount);
-            collectDatapoint("B", batchCount);
-            collectDatapoint("W", batchCount);
+            int8_t flag = batchCount == 0 ? 1 : 0;
+            if (batchCount == BATCH_SIZE - 1)
+                flag = -1;
+            collectDatapoint("R", batchCount, flag);
+            collectDatapoint("G", batchCount, flag);
+            collectDatapoint("B", batchCount, flag);
+            collectDatapoint("W", batchCount, flag);
             
             // led.clear();
             batchCount++;
@@ -530,29 +505,12 @@ void loop()
     }
 
     logMsg("Going to sleep", "SLEEP");
+    // as7341.enableLED(false); // Desliga LED interno do AS7341
     mqttFlushAndDisconnect();
     WiFi.disconnect(true); // Otimiza consumo
     led.clear(); // Apaga LED
-    digitalWrite(BUILTIN_LED_PIN, LOW);
     esp_light_sleep_start(); // Entra em modo de sono leve
 }
 
 // Todo:
 // - Implementar QoS 1 MQTT (futuro)
-// - Implementar Battery Level
-// #define ADC_PIN      34
-// #define R1           100000.0 // 100kΩ
-// #define R2           47000.0  // 47kΩ
-
-// void setup() {
-//   Serial.begin(115200);
-// }
-
-// void loop() {
-//   int raw = analogRead(ADC_PIN);
-//   float v_adc = raw * (3.3 / 4095.0); // Conversão ADC ESP32 (12 bits)
-//   float v_bat = v_adc / (R2 / (R1 + R2));
-//   Serial.print("Tensão bateria: ");
-//   Serial.println(v_bat);
-//   delay(5000);
-// }

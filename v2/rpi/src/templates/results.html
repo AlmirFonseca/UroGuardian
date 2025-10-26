@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>SAMPLE_RESULT</title>
+  <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+    body { font-family: Arial; margin:32px; }
+    table { border-collapse:collapse; width:100%; margin-bottom:2em; }
+    th, td { border:1px solid #ccc; padding:6px 10px;}
+    th { background:#eee; }
+    h2 { margin-top:2em;}
+  </style>
+</head>
+<body>
+  <h1>Resumo da Amostra #{{ urine_sample.sample_id }}</h1>
+  <table>
+    {% for k,v in urine_sample.items() %}
+      <tr>
+        <th>{{ k }}</th>
+        <td>{{ v }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Dados Espectrais</h2>
+  <table>
+    <tr>
+      {% for key in spectrum_datapoints[0].keys() %}
+        <th>{{ key }}</th>
+      {% endfor %}
+    </tr>
+    {% for row in spectrum_datapoints %}
+      <tr>
+        {% for val in row.values() %}
+          <td>{{ val }}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

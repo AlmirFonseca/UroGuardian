@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Logs</title>
+  <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+<body>
+  <h2>Logs do sistema</h2>
+  <table class="log-table">
+    <tr><th>Data</th><th>Nível</th><th>Mensagem</th></tr>
+    {% for log in logs %}
+    <tr>
+      <td>{{ log.timestamp }}</td>
+      <td>{{ log.code }}</td>
+      <td>{{ log.message }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

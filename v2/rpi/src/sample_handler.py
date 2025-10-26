@@ -1,5 +1,7 @@
 from datetime import datetime
+import random
 from typing import Dict, Any
+import time
 
 from src.config_manager import ConfigManager
 from src.database import Database
@@ -17,7 +19,7 @@ class SampleHandler:
         current_sample_id (Optional[int]): ID da amostra atualmente em execução (ciclo aberto).
     """
 
-    def __init__(self, database: Database):
+    def __init__(self, database: Database, controller: "Controller"):
         """Inicializa o SampleHandler com o banco de dados alvo.
 
         Args:
@@ -28,6 +30,7 @@ class SampleHandler:
         """
         self.db = database
         self.logger = Logger()
+        self.controller = controller
         # Mantém em memória a sample em andamento (por device, se quiser expandir, use dict)
         self.current_sample_id = None
 
@@ -57,9 +60,26 @@ class SampleHandler:
             # e armazena o ID corrente para os próximos datapoints dessa amostra
             self.current_sample_id = self.db.create_sample(device_id, start_timestamp=timestamp)
             self.logger.println(f"Iniciando nova sample para device {device_id}: {self.current_sample_id}", "DEBUG")
+            
+            # Altera o estado global para "collecting"
+            self.controller.set_stage({"stage": "collecting"})
 
         # Insere o datapoint no banco, associando ao sample_id corrente
         payload["sample_id"] = self.current_sample_id
+        
+        # print("TOPIC:", "handle_datapoint")
+        # print("DATA:", payload)
+        # print("DATA TYPE:", type(payload))
+        # for d in payload:
+        #     print(" -", d, ":", payload[d], "(", type(payload[d]), ")")
+            
+        # # force timestamp to be and str
+        # payload["timestamp"] = str(payload["timestamp"])
+        
+        # # if sample_id is None, set to -1
+        # if payload["sample_id"] is None:
+        #     payload["sample_id"] = -1
+        
         self.db.insert_dict_into_table("spectrum_datapoints", payload, query_key="insert_spectrum_datapoint")
         self.logger.println(f"Datapoint armazenado (sample {self.current_sample_id}): {payload}", "DEBUG")
 
@@ -67,10 +87,14 @@ class SampleHandler:
             # Fim da sample: marca encerramento e dispara etapa de pós-processamento
             self.db.close_sample(self.current_sample_id, end_timestamp=timestamp)
             self.logger.println(f"Finalizando sample {self.current_sample_id} em {timestamp}", "INFO")
-            self.mock_post_process(self.current_sample_id)
+            
+            # Altera o estado global para "processing"
+            self.controller.set_stage({"stage": "processing"})
+            
+            self.process_sample(self.current_sample_id)
             self.current_sample_id = None
 
-    def mock_post_process(self, sample_id: int) -> None:
+    def process_sample(self, sample_id: int) -> None:
         """Mock de callback chamado no final do ciclo da amostra, para processamento extra.
 
         Args:
@@ -79,4 +103,35 @@ class SampleHandler:
         Returns:
             None
         """
-        print(f"[MOCK] Processamento extra da amostra finalizada: {sample_id}")
+        
+        hydration_result = random.choice(["Hidratado", "OK", "Desidratado", "Muito desidratado", "Severamente desidratado"])  # MOCK result
+        print(f"[MOCK] Processamento extra da amostra finalizada: {sample_id} (hidratação: {hydration_result})")
+        
+        # Update sample with hydration result
+        self.db.update_data(
+            table="urine_samples",
+            data={"hydration_level": hydration_result},
+            condition=f"sample_id = {sample_id}"
+        )
+
+        # Simula tempo de processamento
+        time.sleep(2)
+        
+        # Altera o estado global para 'results'
+        self.controller.set_stage({"stage": "results"})
+
+    def associate_sample_to_user(self, user_id: int, sample_id: int = None) -> None:
+        """Associa um usuário a uma amostra específica no banco de dados.
+
+        Args:
+            user_id (int): ID do usuário a ser associado.
+            sample_id (int): ID da amostra a ser associada.
+
+        Returns:
+            None
+        """
+        self.db.update_data(
+            table="urine_samples",
+            data={"user_id": user_id},
+            condition=f"sample_id = {sample_id if sample_id is not None else self.current_sample_id}"
+        )

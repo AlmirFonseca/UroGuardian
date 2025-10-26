@@ -1,3 +1,4 @@
+import functools
 import sqlite3
 import subprocess
 import re
@@ -127,7 +128,7 @@ class Database:
                 if return_last_row_id:
                     return cursor.lastrowid
 
-    def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
+    def fetch_one(self, query_key: str, query: Optional[str] = "", params: tuple = (), format: str = "tuple") -> Any:
         """Fetch a single result from a query.
 
         Args:
@@ -151,9 +152,16 @@ class Database:
         cursor = self.connection.cursor()
         cursor.execute(query, params)
         
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        
+        if row is None:
+            return None
+        if format == "dict":
+            columns = [desc[0] for desc in cursor.description]
+            return dict(zip(columns, row))
+        return row
 
-    def fetch_all(self, query_key: str, query: Optional[str] = "", params: tuple = ()) -> Any:
+    def fetch_all(self, query_key: str, query: Optional[str] = "", params: tuple = (), format: str = "tuple") -> Any:
         """Fetch all results from a query.
 
         Args:
@@ -177,7 +185,11 @@ class Database:
         cursor = self.connection.cursor()
         cursor.execute(query, params)
         
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        if format == "dict":
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+        return rows
 
     def insert_data_with_query(self, query_key: str, table: str, data: Dict[str, Any]) -> None:
         """Insert data into the specified table.
@@ -226,11 +238,22 @@ class Database:
         placeholders = ",".join(["?"] * len(data))
         values = tuple(data.values())
         
+                # print("TOPIC:", "handle_datapoint")
+        # print("DATA:", payload)
+        # print("DATA TYPE:", type(payload))
+        # for d in payload:
+        #     print(" -", d, ":", payload[d], "(", type(payload[d]), ")")
+        
         query = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
+        
+        print("FIELDS:", fields)
+        print("PLACEHOLDERS:",placeholders)
+        print("VALUES:", values)
+        print("QUERY:", query)
         
         self.execute_query(query_key, query, values)
 
-    def update_data(self, query_key: str, table: str, data: Dict[str, Any], condition: Optional[str] = "1=1") -> None:
+    def update_data(self, table: str, data: Dict[str, Any], condition: Optional[str] = "1=1", query_key: str = "update_data") -> None:
         """Update data in the specified table based on a condition.
 
         Args:
@@ -252,6 +275,31 @@ class Database:
         set_clause = ', '.join([f"{key} = ?" for key in data.keys()])
         query = query.format(table=table, set_clause=set_clause, condition=condition)        
         self.execute_query(query_key, query, tuple(data.values()))
+
+    def increment_data(self, table: str, column: str, amount: int = 1, condition: Optional[str] = "1=1", params: Optional[tuple] = (), query_key: str = "update_data",) -> None:
+        """
+        Increment a numerical column in the specified table by a given amount.
+
+        Args:
+            query_key (str): The key identifying the increment query.
+            table (str): Table name.
+            column (str): Column to increment.
+            amount (int): Amount to increment by (default 1).
+            condition (str): Condition for update (e.g., 'user_id = ?').
+            params (tuple): Parameters for the condition placeholders.
+
+        Raises:
+            ValueError: If query_key is not found.
+        """
+        query = self.queries.get("update", {}).get(query_key)
+        if not query:
+            raise ValueError(f"Increment query with key '{query_key}' not found.")
+        set_clause = f"{column} = {column} + ?"
+        query = query.format(table=table, set_clause=set_clause, condition=condition)
+        # amount should be first param, then params for condition
+        query_params = (amount,) + params
+        self.execute_query(query_key, query, query_params)
+
         
     def mock_data(self) -> None:
         """Load mock data into the database for testing purposes.
@@ -436,7 +484,7 @@ class Database:
         except Exception as e:
             raise ValueError(f"Error while retrieving MAC address: {str(e)}")
 
-
+    @functools.cache
     def get_device_id(self, mac_address: str) -> Optional[str]:
         """Get the device ID from the system according to the mac_address
         
@@ -478,41 +526,12 @@ class Database:
         Insere um novo dispositivo na tabela device e retorna o device_id criado.
         """
         query_key = "insert_device"
-        values = (mac_address, "Unknown", "Unknown", "Unknown", "active", "Unknown", "Unknown")
+        values = (mac_address, "ESP32", "active")
 
         return self.execute_query(query_key,
                            self.queries["dml"][query_key],
                            values,
                            return_last_row_id=True)
-        
-    def get_urine_bag_id(self, force_update: bool = False) -> Optional[str]:
-        """Get the urine bag ID from the urine_bag table according to the device ID and where 'status' is 'active'
-        
-        Args:
-            force_update (bool): If True, forces an update of the urine bag ID.
-            
-        Returns:
-            str: The urine bag ID.
-            
-        Raises:
-            ValueError: If the urine bag ID is not found or if the device ID is not set.
-        """
-        
-        if self.urine_bag_id and not force_update:
-            return self.urine_bag_id
-        
-        try:
-            # Get the urine bag ID from the urine_bag table where device_id matches and status is active
-            query = "SELECT id FROM urine_bag WHERE device_id = ? AND status = 'active'"
-            
-            self.urine_bag_id = self.fetch_one("get_urine_bag_id", query, (self.device_id,))[0]
-            
-            self.logger.println(f"Retrieved Urine Bag ID: {self.urine_bag_id} ({type(self.urine_bag_id)})", "DEBUG")
-            
-            return self.urine_bag_id
-        except Exception as e:
-            self.logger.println(f"Error getting urine bag ID: {e}", "ERROR")
-            return None
         
     def count_query_params(self, query: str) -> int:
         """
@@ -589,7 +608,7 @@ class Database:
             int: ID da amostra criada.
         """
         # Organiza os valores na ordem correta
-        values = (None, device_id, start_timestamp, None, None, None, None)
+        values = (None, device_id, start_timestamp, None, None, None)
         
         # Insere a nova amostra e retorna o ID gerado utilizando uma query pré-definida
         return self.execute_query("insert_urine_sample",
@@ -609,29 +628,62 @@ class Database:
             None
         """
         # Atualiza o timestamp de término da amostra
-        query = "UPDATE urine_samples SET end_timestamp = ? WHERE sample_id = ?"
-        self.execute_query("close_sample", query, (end_timestamp, sample_id))
+        self.update_data(
+            table="urine_samples",
+            data={"end_timestamp": end_timestamp},  # <-- dict as required
+            condition=f"sample_id = {sample_id}"
+        )
 
-    def insert_spectrum_datapoint(self, data: dict):
+    def get_user_id(self, nfc_card_uid_hash: str) -> Optional[int]:
         """
-        Insere um datapoint de espectro na tabela spectrum_datapoints.
+        Recupera o user_id a partir do hash do cartão NFC. 
+        Caso não exista, insere um novo usuário e retorna o novo user_id.
 
         Args:
-            data (dict): Dicionário contendo os dados do datapoint.
+            nfc_card_uid_hash (str): Hash do cartão NFC.
 
         Returns:
-            None
+            int: user_id correspondente.
         """
-        # Define os campos esperados e organiza os valores na ordem correta
-        fields = [
-            "sample_id", "timestamp", "batch", "flag", "led_color", "led_intensity",
-            "channel_415nm", "channel_445nm", "channel_480nm", "channel_515nm",
-            "channel_555nm", "channel_590nm", "channel_630nm", "channel_680nm",
-            "channel_clear", "channel_nir"
-        ]
-        values = tuple(data.get(f) for f in fields)
+        self.logger.println(f"Getting user_id by NFC hash: {nfc_card_uid_hash}", "DEBUG")
+
+        # 1. Tente buscar user_id existente
+        fetch_result = self.fetch_one("fetch_user_id", params=(nfc_card_uid_hash,))
+        user_id = fetch_result[0] if fetch_result else None
+
+        if user_id:
+            self.logger.println(f"User already registered with hash {nfc_card_uid_hash}. ID: {user_id}", "INFO")
+            
+            self.increment_data(
+                table="user",
+                column="num_data_collections",
+                condition="user_id = ?",
+                params=(user_id,)
+            )
+
+            # (Opcional) atualizar campo num_data_collections aqui, se desejar
+            return user_id
         
-        # Insere o datapoint utilizando uma query pré-definida
-        self.execute_query("insert_spectrum_datapoint",
-                        self.queries["dml"]["insert_spectrum_datapoint"],
-                        values)
+        # 2. Caso não exista, insere novo usuário
+        user_id = self.insert_user(nfc_card_uid_hash)
+        self.logger.println(f"User (hash {nfc_card_uid_hash}) cadastrada automaticamente. ID: {user_id}", "INFO")
+        return user_id
+
+    def insert_user(self, nfc_card_uid_hash: str) -> int:
+        """
+        Insere novo usuário na tabela user e retorna user_id criado.
+
+        Args:
+            nfc_card_uid_hash (str): Hash do cartão NFC.
+
+        Returns:
+            int: O user_id do novo usuário.
+        """
+        query_key = "insert_user"
+        values = (nfc_card_uid_hash,)
+        return self.execute_query(
+            query_key,
+            self.queries["dml"][query_key],
+            values,
+            return_last_row_id=True
+        )

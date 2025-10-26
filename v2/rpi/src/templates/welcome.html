@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="UTF-8">
+  <title>UroGuardian - Início</title>
+  <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+  <div class="main-layout">
+    <div class="left-panel">
+      <header>
+        <h1 class="logo">UroGuardian</h1>
+        <h2 class="slogan">Monitoramento inteligente da hidratação no trabalho</h2>
+      </header>
+      <main>
+        <img src="{{ url_for('static', filename='img/3d_model.png') }}" class="main-illustration" alt="3D model of the sensor device.">
+        <p class="instruction"><b class="blue-text">Urine</b> no dispositivo instalado no mictório para começar.</p>
+      </main>
+      <footer>
+        <p class="consent">
+          Ao utilizar este mictório, você consente em contribuir, de forma <b>voluntária e anônima</b>, com dados para a
+          pesquisa acadêmica '<b>UroGuardian</b>', realizada pelo graduando Almir Fonseca sob orientação do Prof.
+          Rafael Pinho. Os dados coletados são tratados, processados e armazenados de forma pseudonimizada, conforme a <b>LGPD</b>, <b>sem possibilidade de identificação dos voluntários</b>, exclusivamente destinados à análise científica.
+        </p>
+      </footer>
+    </div>
+    <div class="right-panel">
+      <div class="invite">
+        <b>Aponte o celular para saber mais sobre o projeto UroGuardian</b>
+      </div>
+      <div class="qr-container">
+        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code para UroGuardian">
+      </div>
+      <div class="project-link">
+        <p>{{ project_url }}</p>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

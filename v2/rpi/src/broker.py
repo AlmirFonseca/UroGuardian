@@ -53,7 +53,7 @@ class Broker:
         self.broker_host = mqtt_conf.get("host", "localhost")
         self.broker_port = mqtt_conf.get("port", 1883)
         self.keepalive = mqtt_conf.get("keepalive", 0)
-        self.qos = mqtt_conf.get("qos", 1)
+        self.qos = mqtt_conf.get("qos", 0)
         self.topics = mqtt_conf.get("topics", {})
 
         # Cliente MQTT
@@ -211,7 +211,7 @@ class Broker:
         
         """
         for topic in self.topics.keys():
-            self.client.subscribe(topic, qos=self.qos if isinstance(self.qos, int) else 1)
+            self.client.subscribe(topic, qos=self.qos if isinstance(self.qos, int) else 0)
             self.logger.println(f"Inscrito no tópico: {topic} (QoS={self.qos})", "INFO")
 
     def publish(self, topic: str, payload: Any, qos: int = 0) -> None:
@@ -280,6 +280,16 @@ class Broker:
                 self.database.insert_dict_into_table(topic, data, query_key="insert_" + topic)
         except Exception as e:
             self.logger.println(f"Erro ao inserir em '{topic}': {e}", "ERROR")
+            
+            self.logger.println(f"Exception type: {type(e).__name__}", "ERROR")
+            self.logger.println(f"Data payload: {repr(data)}", "ERROR")
+            self.logger.println(f"Data keys: {list(data.keys())}", "ERROR")
+            for key in data:
+                self.logger.println(f" - {key}: {data[key]} (type: {type(data[key]).__name__})", "ERROR")
+            import traceback
+            tb_str = traceback.format_exc()
+            self.logger.println(f"Stack trace:\n{tb_str}", "ERROR")
+
         else:            
             self.logger.println(f"Registro inserido em '{topic}': {data}", "DEBUG")
 
@@ -315,7 +325,13 @@ class Broker:
 
         Returns:
             None
-        """        
+        """
+        
+        if msg.retain:
+            # Optionally log and skip retained messages
+            self.logger.println(f"Ignorado mensagem retida no tópico {msg.topic}", "DEBUG")
+            return
+        
         payload_timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         payload = msg.payload.decode("utf-8")
         self.logger.println(f"Mensagem recebida no tópico '{msg.topic}': {payload} ({payload_timestamp})", "INFO")
