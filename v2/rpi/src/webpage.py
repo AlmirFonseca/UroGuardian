@@ -135,7 +135,7 @@ class WebPage:
         if extra_data:
             payload.update(extra_data)
         self.socketio.emit('stage_update', payload)
-        self.logger.println(f"WEBPAGE Emitindo mudança de etapa: {payload.get("stage", None)} ({payload})", "INFO")
+        self.logger.println(f"WEBPAGE Emitindo mudança de etapa: {payload.get('stage', None)} ({payload})", "INFO")
 
     def run(self, host="0.0.0.0", port=5000, debug=False):
         # self.app.run(host=host, port=port, debug=debug)

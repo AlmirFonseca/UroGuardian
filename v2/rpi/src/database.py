@@ -30,7 +30,7 @@ class Database:
     def __init__(self, config_manager: ConfigManager, 
                  db_filepath: str = "../database/sensor_data.db", 
                  db_queries_filepath = "../config/db_queries.yaml",
-                 web_interface: bool = True) -> None:
+                 web_interface: bool = False) -> None:
         """Initializes the database connection and loads queries.
 
         Args:

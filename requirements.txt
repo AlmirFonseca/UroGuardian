@@ -13,3 +13,4 @@ psutil==5.9.6
 PyYAML==6.0.3
 qrcode==8.2
 schedule==1.2.2
+sqlite-web==0.6.4

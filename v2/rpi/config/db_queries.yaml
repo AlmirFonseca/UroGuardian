@@ -222,21 +222,7 @@ fetch:
     FROM urine_samples 
     WHERE user_id = ? 
     ORDER BY start_timestamp DESC 
-
-  # fetch_user_history: |
-  #   SELECT 
-  #     us.sample_id, us.start_timestamp, us.end_timestamp, us.hydration_level,
-  #     sd.timestamp AS datapoint_timestamp, sd.batch, sd.flag, sd.led_color, sd.led_intensity,
-  #     sd.channel_415nm, sd.channel_445nm, sd.channel_480nm, sd.channel_515nm,
-  #     sd.channel_555nm, sd.channel_590nm, sd.channel_630nm, sd.channel_680nm,
-  #     sd.channel_clear, sd.channel_nir,
-  #     u.user_id, u.nfc_card_uid_hash, u.first_use_datetime, u.num_data_collections
-  #   FROM urine_samples us
-  #   JOIN spectrum_datapoints sd ON us.sample_id = sd.sample_id
-  #   JOIN user u ON us.user_id = u.user_id
-  #   WHERE us.user_id = ?
-  #   ORDER BY us.start_timestamp DESC, sd.timestamp DESC
-
+    
   fetch_user_history: |
     SELECT us.sample_id, us.start_timestamp, us.end_timestamp, us.hydration_level,
            sd.timestamp AS datapoint_timestamp, sd.batch, sd.flag, sd.led_color, sd.led_intensity,
