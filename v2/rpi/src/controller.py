@@ -56,20 +56,7 @@ class Controller:
         self.logger.println("Initializing NFC reader...", "INFO")
         self.nfc_reader = NFCReader(self.config, self.db)
         
-        
-        
-        
-        # Initializing system monitoring
-        # self.monitor = SystemMonitoring(self.db)
-
-        
         self.logger.println("Controller initialized successfully.", "INFO")
-        
-        
-        # if web_interface:
-        #     self.logger.println("Webpage interface enabled.", "INFO")
-        #     self.run()
-
 
     def set_stage(self, stage: dict, extra: dict = None) -> None:
         """
@@ -87,16 +74,16 @@ class Controller:
         # Se a etapa for 'results', inicia leitura NFC contínua
         if stage.get("stage") == "results":    
             # Start continuous NFC reading in background
+            self.logger.println("Iniciando leitura NFC contínua...", "INFO")
             self.nfc_reader.read_tag_continuous(
                 timeout=self.nfc_timeout,
                 poll_interval=1.0,
                 callback=self._on_nfc_detected
             )
-            
-            
 
     def _on_nfc_detected(self, tag_info):
         
+        self.logger.println(f"NFC tag detected: {tag_info}", "INFO")
         self.nfc_reader.stop_continuous()
         
         # Associe hash tag a um user_id (if not found, create a new user)
@@ -106,8 +93,7 @@ class Controller:
         self.sample_handler.associate_sample_to_user(user_id)
         
         # Update webpage to history stage with user_id
-        self.set_stage({'stage': 'history'}, {'user_id': user_id})            
-            
+        self.set_stage({'stage': 'history'}, {'user_id': user_id})
 
     # def toggle_pause(self):
     #     self.is_paused = not self.is_paused

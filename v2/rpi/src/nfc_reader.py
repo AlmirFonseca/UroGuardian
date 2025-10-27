@@ -1,5 +1,9 @@
 # # nfc_reader.py
 
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import os
 import time
 import binascii
 import threading
@@ -161,6 +165,32 @@ class NFCReader:
         return None
 
 
+if __name__ == "__main__":
+    import sys
+
+    print("===== Teste de NFCReader =====")
+    try:
+        config_path = "../config" if os.path.exists("../config") else "./config"
+        config = ConfigManager(config_path)
+        db = Database(config)
+        reader = NFCReader(config, db)
+    except Exception as e:
+        print(f"Erro de inicialização do sistema: {e}")
+        sys.exit(1)
+
+    def tag_callback(tag):
+        print(f">>> TAG DETECTADA: UID={tag['uid']} em {tag['timestamp']}")
+        # Aqui você pode incluir lógica de consulta/associação de usuário:
+        # user_id = db.get_user_id(tag['uid'])
+        # print(f"User_id associado: {user_id}")
+
+    print("-- Iniciando leitura NFC por 15 segundos! Aproxime seu cartão/tag --")
+    tag = reader.read_tag_continuous(timeout=15, poll_interval=0.5, callback=tag_callback)
+    if tag:
+        print(f"Tag lida! Dados: {tag}")
+    else:
+        print("Nenhuma tag detectada durante a janela de tempo.")
+    print("Fim do teste.")
 
 
 
