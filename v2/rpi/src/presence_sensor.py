@@ -65,7 +65,8 @@ class PresenceSensor:
 
     def stop_polling(self):
         self.polling = False
-        if self._thread and self._thread.is_alive():
+        # Só chama join se NÃO está na thread de polling
+        if self._thread and self._thread.is_alive() and threading.current_thread() != self._thread:
             self._thread.join(timeout=2)
         self.logger.println("PresenceSensor polling parado.", "INFO")
 
