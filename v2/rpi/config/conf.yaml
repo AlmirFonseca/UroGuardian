@@ -52,7 +52,6 @@ system: WINDOWS
 # system: LINUX
 
 sqlite_web_interface: false
-app_web_interface: true
 
 nfc:
   nfc_timeout: 20 # Tempo limite em segundos para leitura NFC (0 desativa o timeout)
@@ -63,6 +62,7 @@ presence_sensor:
   in_use_threshold_cm: 60 # Distância em centímetros para detectar uso do mictório
 
 app_web_interface:
+  active: true
   launch_browser_on_start: true
   host: "localhost"
   port: 5000
