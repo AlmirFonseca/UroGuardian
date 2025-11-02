@@ -16,8 +16,8 @@ from src.controller import Controller
 if __name__ == "__main__":
     controller = Controller()
     # controller.start()
-    
-    if controller.config.get("conf").get("app_web_interface"):
+
+    if controller.config.get("conf").get("app_web_interface").get("active", True):
         threading.Thread(target=controller.webpage.run, daemon=True).start()
         
     time.sleep(5)
