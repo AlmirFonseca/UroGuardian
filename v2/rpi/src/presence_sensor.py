@@ -1,6 +1,7 @@
 import asyncio
 import threading
 import time
+import traceback
 from enum import Enum
 
 from aio_ld2410 import LD2410, ReportBasicStatus
@@ -39,7 +40,10 @@ class PresenceSensor:
                 self.logger.println(f"Evento de presença: {event.name} | {report.basic}", "DEBUG")
                 return event
         except Exception as e:
+            # Captura traceback completo da exceção
+            tb_str = traceback.format_exc()
             self.logger.println(f"Erro na leitura do PresenceSensor: {e}", "ERROR")
+            self.logger.println(f"Traceback detalhado: {tb_str}", "ERROR")
             return PresenceEvent.NO_PRESENCE
 
     def _interpret_report(self, rep: ReportBasicStatus) -> PresenceEvent:
@@ -93,18 +97,18 @@ class PresenceSensor:
 # Use start_polling(callback) para polling.
 
 # EXEMPLO DE USO ----------------------------------
-# if __name__ == "__main__":
-#     import sys
-#     sys.path.append("..")  # Garante import ao rodar como script
+if __name__ == "__main__":
+    import sys
+    sys.path.append("..")  # Garante import ao rodar como script
 
-#     async def main():
-#         cfg = ConfigManager("../config")
-#         log = Logger()
-#         pres = PresenceSensor(cfg, log)
-#         print("--- Teste de Presença ---")
-#         for i in range(5):
-#             evt = await pres.get_event()
-#             print(f"Leitura {i+1}: Evento = {evt.name} (valor={evt.value})")
-#             time.sleep(2)
+    async def main():
+        cfg = ConfigManager("../config")
+        log = Logger()
+        pres = PresenceSensor(cfg, log)
+        print("--- Teste de Presenca ---")
+        for i in range(5):
+            evt = await pres.get_event()
+            print(f"Leitura {i+1}: Evento = {evt.name} (valor={evt.value})")
+            time.sleep(2)
 
-#     asyncio.run(main())
+    asyncio.run(main())
