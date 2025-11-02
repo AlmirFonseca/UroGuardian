@@ -62,7 +62,7 @@ presence_sensor:
   near_threshold_cm: 120 # Distância em centímetros para detectar presença próxima
   in_use_threshold_cm: 60 # Distância em centímetros para detectar uso do mictório
 
-web_interface:
+app_web_interface:
   launch_browser_on_start: true
   host: "localhost"
   port: 5000

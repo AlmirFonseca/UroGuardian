@@ -17,7 +17,7 @@ from src.sample_handler import SampleHandler
 from src.broker import Broker
 from src.webpage import WebPage
 from src.nfc_reader import NFCReader
-from src.presence_sensor import PresenceSensor
+from src.presence_sensor import PresenceSensor, PresenceEvent
 
 class Controller:
     def __init__(self):
