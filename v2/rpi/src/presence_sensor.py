@@ -28,7 +28,7 @@ class PresenceSensor:
         self.polling = False
         self._thread = None
 
-    async def get_event(self, timeout: float = 5.0) -> PresenceEvent:
+    async def get_event(self, timeout: float = 10.0) -> PresenceEvent:
         self.logger.println("Conectando ao PresenceSensor...", "INFO")
         try:
             async with LD2410(self.device_path) as device:
