@@ -4,18 +4,68 @@
   <meta charset="UTF-8">
   <title>SAMPLE_RESULT</title>
   <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/d3.v7.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 <style>
-    body { font-family: Arial; margin:32px; }
+    body { margin:32px; }
     table { border-collapse:collapse; width:100%; margin-bottom:2em; }
     th, td { border:1px solid #ccc; padding:6px 10px;}
     th { background:#eee; }
     h2 { margin-top:2em;}
+
+    .main-label {
+      font-size: 45pt;
+      font-weight: bold;
+      -webkit-text-stroke-width: 2px;
+      -webkit-text-stroke-color: #222;
+      margin: 0 auto 18px auto;
+      text-align: center;
+      display: block;
+    }
+    #hydrationLevel { margin:200px auto auto auto; text-align: center; }
+    #hydrationMessage { font-size: 28px; text-align: center; font-style: italic; margin-top: 30px; margin-bottom: 100px; min-height: 2em;}
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body.layout-vertical {
+      min-height: 100vh;    /* Full viewport height */
+      display: flex;
+      flex-direction: column;
+    }
+
+    .footer-nfc {
+      width: 100%;
+      text-align: center;
+      padding: 18px 0;
+      background: #fafbfc;
+      border-top: 1px solid #e0e0e0;
+      /* Remove any margin-top if you want it always flush with the bottom */
+      margin-top: 20px;
+    }
+
+    .footer-nfc p {
+      margin: 0 0 4px 0;
+      font-size: 25px;
+      color: #444;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    .footer-nfc .nfc-icon {
+      width: 120px;
+      display: block;
+      margin: 20px auto;
+    }
+
   </style>
 </head>
-<body>
-  <h1>Resumo da Amostra #{{ urine_sample.sample_id }}</h1>
+<body class="layout-vertical">
+
+  <!-- <h1>Resumo da Amostra #{{ urine_sample.sample_id }}</h1>
   <table>
     {% for k,v in urine_sample.items() %}
       <tr>
@@ -23,9 +73,9 @@
         <td>{{ v }}</td>
       </tr>
     {% endfor %}
-  </table>
+  </table> -->
 
-  <h2>Dados Espectrais</h2>
+  <!-- <h2>Dados Espectrais</h2>
   <table>
     <tr>
       {% for key in spectrum_datapoints[0].keys() %}
@@ -39,6 +89,192 @@
         {% endfor %}
       </tr>
     {% endfor %}
-  </table>
+  </table> -->
+
+
+  <div id="hydrationLevel"></div>
+
+
+<script>
+  // Setup categories and colors
+  const hydrationCategories = [
+    "Hidratado",
+    "OK",
+    "Desidratado",
+    "Muito desidratado",
+    "Severamente desidratado",
+  ];
+  const hydrationColors = {
+    "Hidratado": "#55A630",
+    "OK": "#AACC00",
+    "Desidratado": "#FFDD00",
+    "Muito desidratado": "#FF0000",
+    "Severamente desidratado": "#6A041D"
+  };
+
+  // Recebe do backend: hydration_level da amostra atual (Jinja template)
+  const hydration_level = "{{ urine_sample.hydration_level|safe }}";
+
+  // SVG droplet
+  const DROPLET_VIEWBOX = "0 0 512 512";
+  const DROPLET_SVG_PATH = `M316.099,85.846c-24.586-35.32-45.821-65.827-50.974-80.433c-1.139-3.215-4.145-5.372-7.554-5.414
+    c-3.15,0.096-6.476,2.044-7.68,5.227c-5.244,13.812-25.405,42.765-48.752,76.314C147.671,158.326,74.447,263.494,74.447,331.917
+    c0,100.926,82.103,183.034,183.029,183.034s183.029-82.108,183.029-183.034C440.505,264.6,368.599,161.285,316.099,85.846z`;
+
+  // Dimensões e estilos
+  const dropletWidth = 95;
+  const dropletHeight = 110;
+  const spacing = 22;
+  const svgWidth = hydrationCategories.length * dropletWidth + (hydrationCategories.length - 1) * spacing;
+  const svgHeight = dropletHeight + 40;
+
+  // Limpa container
+  d3.select("#hydrationLevel").html("");
+
+  // Label central
+  d3.select("#hydrationLevel")
+    .append("span")
+    .attr("class", "main-label")
+    .text(hydration_level)
+    .style("color", hydrationColors[hydration_level] || "#555");
+
+  // Container SVG
+  const svg = d3
+    .select("#hydrationLevel")
+    .append("svg")
+    .attr("width", svgWidth)
+    .attr("height", svgHeight);
+
+  // Posicionamento e lógica
+  const currentIdx = hydrationCategories.indexOf(hydration_level);
+
+  hydrationCategories.forEach((cat, i) => {
+    const x = i * (dropletWidth + spacing);
+    const filled = i <= currentIdx;
+    const fill = filled ? hydrationColors[cat] : "#ededed";
+    const opacity = filled ? 1 : 0.25;
+    const stroke = filled ? "#111" : "#aaa";
+    const strokeWidth = filled ? 3 : 2;
+
+    // Desenha droplet SVG
+    const dropletSVG = svg
+      .append("svg")
+      .attr("x", x)
+      .attr("y", 26)
+      .attr("width", dropletWidth)
+      .attr("height", dropletHeight)
+      .attr("viewBox", DROPLET_VIEWBOX)
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    dropletSVG
+      .append("path")
+      .attr("d", DROPLET_SVG_PATH)
+      .attr("fill", fill)
+      .attr("opacity", opacity)
+      .attr("stroke", stroke)
+      .attr("stroke-width", strokeWidth);
+
+    // Label da categoria sob o ícone
+    dropletSVG
+      .append("text")
+      .attr("x", 256)
+      .attr("y", 500)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 13)
+      .attr("font-weight", i === currentIdx ? "bold" : "normal")
+      .attr("fill", i === currentIdx ? fill : "#444")
+      .text(cat);
+  });
+
+</script>
+
+<div id="hydrationMessage"></div>
+
+<script>
+    const hydrationMessages = {
+  "Hidratado": [
+    "Parabéns! Seu corpo está muito bem hidratado.",
+    "Urina clara é sinal de saúde e equilíbrio hídrico!",
+    "Manter-se hidratado é fundamental para o bom funcionamento dos rins.",
+    "Ótimo trabalho bebendo água regularmente.",
+    "Seu nível de hidratação indica ótimo desempenho dos seus órgãos.",
+    "Curiosidade: a urina clara é quase transparente devido à boa diluição.",
+    "A hidratação adequada ajuda a eliminar toxinas com eficiência.",
+    "Continuar assim vai garantir mais energia ao longo do dia.",
+    "Seu corpo agradece cada gole d'água que você toma.",
+    "Boa hidratação contribui para uma pele mais saudável."
+  ],
+  "OK": [
+    "Você está razoavelmente hidratado, mas pode melhorar.",
+    "Tente beber um pouco mais de água durante o dia.",
+    "Urina com tom amarelo claro é um bom sinal.",
+    "Hidratar-se ajuda a manter a concentração.",
+    "Beber água auxilia a digestão e o equilíbrio corporal.",
+    "Sinal leve de atenção ao seu consumo diário de líquidos.",
+    "Equilibre-se para evitar os efeitos da desidratação.",
+    "Lembre-se, pequenos hábitos fazem grande diferença.",
+    "Manter-se hidratado previne dores de cabeça.",
+    "Não deixe a sede ser seu único sinal para beber água."
+  ],
+  "Desidratado": [
+    "Sua urina está mais concentrada; aumente a ingestão de líquidos.",
+    "Lembre-se: a desidratação pode causar fadiga e sonolência.",
+    "Beber água agora pode melhorar sua disposição.",
+    "Cuidado, a desidratação afeta o funcionamento dos rins.",
+    "Você pode sentir boca seca e urina escura – hidratação é essencial.",
+    "Procure beber pelo menos 8 copos de água por dia.",
+    "Evite bebidas cafeinadas que podem aumentar a desidratação.",
+    "Aumente o consumo de frutas e vegetais ricos em água.",
+    "Hidrate-se antes, durante e após atividades físicas.",
+    "A desidratação pode reduzir o desempenho físico e mental."
+  ],
+  "Muito desidratado": [
+    "Estado preocupante: procure aumentar a ingestão de água rapidamente.",
+    "Urina escura pode indicar risco para a função renal.",
+    "Sintomas como tontura e fadiga podem estar associados.",
+    "A desidratação severa pode afetar sua pressão arterial.",
+    "Cuidado: persistência desse quadro exige avaliação médica.",
+    "Evite exposição ao sol intenso sem hidratação frequente.",
+    "Procure consumir líquidos com eletrólitos, como água de coco.",
+    "Não ignore sinais de desidratação intensa.",
+    "Fique atento a vontade urinária reduzida.",
+    "Se possível, consulte um profissional para orientações específicas."
+  ],
+  "Severamente desidratado": [
+    "Este é um sinal grave — procure auxílio médico imediato.",
+    "Urina muito escura e concentrada indica risco de insuficiência renal.",
+    "Desidratação severa pode levar a confusão mental e desmaios.",
+    "Mantenha-se em ambiente fresco e busque hidratação intravenosa se preciso.",
+    "A reposição rápida de líquidos e eletrólitos é vital.",
+    "Não subestime a gravidade desse nível de desidratação.",
+    "Evite atividades físicas até normalizar sua hidratação.",
+    "Reporte sempre sintomas neurológicos associados.",
+    "Esteja acompanhado quando buscar atendimento médico.",
+    "Sua saúde depende da recuperação rápida e adequada da hidratação."
+  ]
+};
+
+function getRandomMessage(level) {
+  const msgs = hydrationMessages[level];
+  if (!msgs || msgs.length === 0) return "";
+  const idx = Math.floor(Math.random() * msgs.length);
+  return msgs[idx];
+}
+
+// Example usage:
+const currentHydrationLevel = "{{ urine_sample.hydration_level|safe }}";
+const messageToShow = getRandomMessage(currentHydrationLevel);
+
+document.getElementById("hydrationMessage").textContent = messageToShow;
+
+</script>
+
+
+<footer class="footer-nfc">
+  <p>Aproxime o crachá no leitor NFC para registrar seu histórico</p>
+  <img src="{{ url_for('static', filename='svg/nfc_icon.svg') }}" alt="NFC Icon" class="nfc-icon" />
+</footer>
+
+
 </body>
 </html>

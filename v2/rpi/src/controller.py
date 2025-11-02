@@ -17,6 +17,7 @@ from src.sample_handler import SampleHandler
 from src.broker import Broker
 from src.webpage import WebPage
 from src.nfc_reader import NFCReader
+from src.presence_sensor import PresenceSensor
 
 class Controller:
     def __init__(self):
@@ -56,6 +57,10 @@ class Controller:
         self.logger.println("Initializing NFC reader...", "INFO")
         self.nfc_reader = NFCReader(self.config, self.db)
         
+        # Initializing Presence Sensor
+        self.logger.println("Initializing presence sensor...", "INFO")
+        self.presence_sensor = PresenceSensor(self.config, self.logger)
+        
         self.logger.println("Controller initialized successfully.", "INFO")
 
     def set_stage(self, stage: dict, extra: dict = None) -> None:
@@ -71,15 +76,24 @@ class Controller:
             # Dispara atualização de tela para todos os navegadores conectados
             self.webpage.update_stage(stage, extra)
             
-        # Se a etapa for 'results', inicia leitura NFC contínua
-        if stage.get("stage") == "results":    
-            # Start continuous NFC reading in background
-            self.logger.println("Iniciando leitura NFC contínua...", "INFO")
-            self.nfc_reader.read_tag_continuous(
-                timeout=self.nfc_timeout,
-                poll_interval=1.0,
-                callback=self._on_nfc_detected
-            )
+        stage_name = stage.get("stage")
+        if stage_name in ["results", "history"]:
+            # Se a etapa for 'results' ou 'history', inicia polling do sensor de presença
+            self.presence_sensor.start_polling(self._on_presence_event, interval=1.0)
+            
+            # Se a etapa for 'results', inicia leitura NFC contínua
+            if stage.get("stage") == "results":    
+                # Start continuous NFC reading in background
+                self.logger.println("Iniciando leitura NFC contínua...", "INFO")
+                self.nfc_reader.read_tag_continuous(
+                    timeout=self.nfc_timeout,
+                    poll_interval=1.0,
+                    callback=self._on_nfc_detected
+                )
+            
+        else:
+            self.presence_sensor.stop_polling()
+            
 
     def _on_nfc_detected(self, tag_info):
         
@@ -94,6 +108,21 @@ class Controller:
         
         # Update webpage to history stage with user_id
         self.set_stage({'stage': 'history'}, {'user_id': user_id})
+        
+    def _on_presence_event(self, event):
+        # Executado em thread separada do polling
+        if event == PresenceEvent.URINAL_IN_USE:
+            # Não faça nada: mantém na tela atual
+            return
+        elif event == PresenceEvent.NEARBY_DETECTED:
+            # Aguarda 3s e volta para welcome
+            self.logger.println("NEARBY_DETECTED: Retornando para welcome em 3s...", "INFO")
+            self.presen
+            time.sleep(3)
+            self.set_stage({"stage": "welcome"})
+        elif event == PresenceEvent.NO_PRESENCE:
+            self.logger.println("NO_PRESENCE: Retornando imediatamente para welcome.", "INFO")
+            self.set_stage({"stage": "welcome"})
 
     # def toggle_pause(self):
     #     self.is_paused = not self.is_paused

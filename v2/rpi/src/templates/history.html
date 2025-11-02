@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Histórico do Usuário</title>
   <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/d3.v7.min.js') }}"></script>
   <script src="{{ url_for('static', filename='js/stage_sync.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
@@ -23,7 +24,8 @@
     <b>Total de coletas:</b> {{ user_info.num_data_collections if user_info else '0' }}<br>
     <span class="tip">As linhas abaixo mostram todas as medições associadas ao seu perfil anonimizado.</span>
   </div>
-  <table class="history-table">
+  
+  <!-- <table class="history-table" style="font-size: 3pt">
     <tr>
       <th>Amostra</th>
       <th>Início</th>
@@ -71,6 +73,107 @@
         </td>
       </tr>
     {% endfor %}
-  </table>
+  </table> -->
+
+  <div id="lineplot"></div>
+
+  
+  <script>
+    // Export history data as JSON for D3
+    const historyData = {{ history|tojson }};
+  </script>
+
+  <script>
+    const hydrationColors = {
+      "Hidratado": "#fffbdf",
+      "OK": "#faf28a",
+      "Desidratado": "#f5ea31",
+      "Muito desidratado": "#ebb322",
+      "Severamente desidratado": "#db9128"
+    };
+
+    function parseTimestamp(ts) {
+      // Try UNIX timestamp (int/float) or fallback to ISO string
+      if (!ts) return null;
+      if (!isNaN(Number(ts))) return new Date(Number(ts) * 1000);
+      const iso = Date.parse(ts);
+      return isNaN(iso) ? null : new Date(iso);
+    }
+
+    // Pre-process data for plotting
+    const plotData = historyData.map(d => ({
+      sample_id: d.sample_id,
+      x: parseTimestamp(d.datapoint_timestamp), // X axis
+      y: +d.channel_480nm,                      // Y axis
+      hydration: d.hydration_level || "OK",
+      led_color: d.led_color
+    })).filter(d => d.x && !isNaN(d.y) && d.led_color === "B"); // MOCK
+
+    const margin = {top: 50, right: 20, bottom: 50, left: 65},
+          width = 720 - margin.left - margin.right,
+          height = 340 - margin.top - margin.bottom;
+
+    const svg = d3.select("#lineplot")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // X/Y scales
+    const x = d3.scaleTime()
+      .domain(d3.extent(plotData, d => d.x))
+      .range([0, width]);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(plotData, d => d.y)]).nice()
+      .range([height, 0]);
+
+    // X axis
+    svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat("%d/%m %H:%M")));
+
+    // Y axis
+    svg.append("g")
+      .call(d3.axisLeft(y));
+
+    // Line
+    svg.append("path")
+      .datum(plotData)
+      .attr("fill", "none")
+      .attr("stroke", "#247afa")
+      .attr("stroke-width", 3)
+      .attr("d", d3.line()
+        .x(d => x(d.x))
+        .y(d => y(d.y))
+      );
+
+    // Points
+    svg.selectAll("circle")
+      .data(plotData)
+      .enter().append("circle")
+      .attr("cx", d => x(d.x))
+      .attr("cy", d => y(d.y))
+      .attr("r", 9)
+      .attr("fill", d => hydrationColors[d.hydration] || "#bdbdbd")
+      .attr("stroke", "#222")
+      .attr("stroke-width", 2);
+
+    // Axis labels
+    svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", width/2)
+      .attr("y", height+40)
+      .text("Data/Hora");
+
+    svg.append("text")
+      .attr("text-anchor", "end")
+      .attr("x", -height/2)
+      .attr("y", -48)
+      .attr("transform", "rotate(-90)")
+      .text("Intensidade 480nm");
+
+    </script>
 </body>
 </html>
