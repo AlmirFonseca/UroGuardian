@@ -29,9 +29,12 @@ class PresenceSensor:
         self._thread = None
 
     async def get_event(self, timeout: float = 5.0) -> PresenceEvent:
+        self.logger.println("Conectando ao PresenceSensor...", "INFO")
         try:
             async with LD2410(self.device_path) as device:
+                self.logger.println("Lendo dados do PresenceSensor...", "INFO")
                 report = await asyncio.wait_for(device.get_next_report(), timeout=timeout)
+                self.logger.println(f"Dados lidos do PresenceSensor: {report.basic}", "INFO")
                 event = self._interpret_report(report.basic)
                 self.logger.println(f"Evento de presença: {event.name} | {report.basic}", "DEBUG")
                 return event
